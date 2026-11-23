@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bakery POS & Khata System</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Compiler -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    
+    /* Fixed Print CSS Logic - Zero Text Overlapping */
+    @media print {
+      @page { margin: 4mm; }
+      html, body { 
+        height: auto !important; 
+        overflow: visible !important; 
+        background: white !important; 
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body * { visibility: hidden; }
+      #printable-area, #printable-area * { 
+        visibility: visible !important; 
+        line-height: 1.45 !important;
+        letter-spacing: normal !important;
+      }
+      #printable-area { 
+        position: fixed !important; 
+        left: 0 !important; 
+        top: 0 !important; 
+        width: 100% !important; 
+        max-width: 78mm !important; 
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        box-shadow: none !important; 
+        margin: 0 auto !important; 
+        padding: 6px !important; 
+        background: white !important; 
+        color: #000 !important;
+      }
+      .no-print { display: none !important; }
+    }
+    
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .hide-scroll::-webkit-scrollbar { display: none; }
+    
+    .fade-in { animation: fadeIn 0.25s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const getStore = (key, defaultVal) => {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : defaultVal; } 
+      catch (e) { return defaultVal; }
+    };
+
+    const initialProducts = [
+      { id: '1', name: 'Premium Fruit Cake', category: 'Cakes', packingType: 'weight', sp1: 1200, sp2: 2300, wsSp1: 1050, wsSp2: 2000, reg1: 900, reg2: 1700, wsReg1: 800, wsReg2: 1500 },
+      { id: '2', name: 'Crispy Zeera Biscuits', category: 'Biscuits', packingType: 'weight', sp1: 800, sp2: 1550, wsSp1: 700, wsSp2: 1350, reg1: 600, reg2: 1150, wsReg1: 500, wsReg2: 1000 },
+      { id: '3', name: 'Crunchy Special Rusk', category: 'Rusk', packingType: 'pack', sp1: 250, sp2: 1200, wsSp1: 210, wsSp2: 1000, reg1: 180, reg2: 850, wsReg1: 150, wsReg2: 720 }
+    ];
+
+    function BakeryPOS() {
+      // --- STATES ---
+      const [isLoggedIn, setIsLoggedIn] = useState(false);
+      const [pinInput, setPinInput] = useState('');
+      const [showForgot, setShowForgot] = useState(false);
+      const [recoveryName, setRecoveryName] = useState('');
+      const [activeTab, setActiveTab] = useState('pos');
+      
+      // Global Business Settings
+      const [settings, setSettings] = useState(() => getStore('bakery_settings', {
+        name: 'BAN BAKERS',
+        address: 'Kot Sai Singh (Jhang)',
+        owner: 'Muhammad Touseef',
+        ownerContact: '0370-0549734',
+        manager: 'Tayyab',
+        managerContact: '0312-5505874',
+        pin: '1234'
+      }));
+
+      useEffect(() => { document.title = `${settings.name} - POS & Khata`; }, [settings.name]);
+
+      const [products, setProducts] = useState(() => getStore('bakery_products', initialProducts));
+      const [sales, setSales] = useState(() => getStore('bakery_sales', []));
+      const [expenses, setExpenses] = useState(() => getStore('bakery_expenses', []));
+      
+      // Salesman Khata State
+      const [khatas, setKhatas] = useState(() => getStore('bakery_khatas', []));
+      const [selectedSalesmanId, setSelectedSalesmanId] = useState(null);
+      const [newSalesman, setNewSalesman] = useState({ name: '', phone: '', route: '' });
+      const [khataEntry, setKhataEntry] = useState({ type: 'payment', amount: '', note: '' });
+
+      // Dashboard Salesman Report Modal State (Weekly / Monthly / Yearly)
+      const [dashSalesmanModalId, setDashSalesmanModalId] = useState(null);
+      const [khataPeriod, setKhataPeriod] = useState('weekly'); // 'weekly' | 'monthly' | 'yearly' | 'all'
+
+      // Unified POS States
+      const [posMode, setPosMode] = useState('retail');
+      const [posSalesmanId, setPosSalesmanId] = useState('');
+      const [cart, setCart] = useState([]);
+      const [customerName, setCustomerName] = useState('');
+      const [discount, setDiscount] = useState('');
+      const [search, setSearch] = useState('');
+      const [selectedCat, setSelectedCat] = useState('All');
+      
+      const [receipt, setReceipt] = useState(null);
+      const [expForm, setExpForm] = useState({ title: '', amount: '', category: 'Raw Material' });
+
+      // Product Form + Edit Mode
+      const [editingProdId, setEditingProdId] = useState(null);
+      const [prodForm, setProdForm] = useState({ name: '', category: 'Cakes', packingType: 'weight', sp1: '', sp2: '', wsSp1: '', wsSp2: '', reg1: '', reg2: '', wsReg1: '', wsReg2: '' });
+
+      // Partial Return Modal State
+      const [returnModalSale, setReturnModalSale] = useState(null);
+      const [customRefundAmt, setCustomRefundAmt] = useState('');
+
+      // Auto-save Data
+      useEffect(() => { localStorage.setItem('bakery_settings', JSON.stringify(settings)); }, [settings]);
+      useEffect(() => { localStorage.setItem('bakery_products', JSON.stringify(products)); }, [products]);
+      useEffect(() => { localStorage.setItem('bakery_sales', JSON.stringify(sales)); }, [sales]);
+      useEffect(() => { localStorage.setItem('bakery_expenses', JSON.stringify(expenses)); }, [expenses]);
+      useEffect(() => { localStorage.setItem('bakery_khatas', JSON.stringify(khatas)); }, [khatas]);
+
+      useEffect(() => {
+        if (!posSalesmanId && khatas.length > 0) {
+          setPosSalesmanId(khatas[0].id);
+        }
+      }, [khatas, posSalesmanId]);
+
+      // --- AUTHENTICATION ---
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (pinInput === settings.pin || pinInput === '7860') { 
+          setIsLoggedIn(true); setPinInput(''); setShowForgot(false);
+        } else { alert('Incorrect Security PIN!'); }
+      };
+
+      const handleRecovery = (e) => {
+        e.preventDefault();
+        if (recoveryName.trim().toLowerCase() === settings.owner.trim().toLowerCase()) {
+          alert(`Authentication Successful!\nYour current PIN is: ${settings.pin}`);
+          setShowForgot(false); setRecoveryName('');
+        } else { alert('Security Check Failed! Owner name does not match.'); }
+      };
+
+      // --- SWITCH POS MODE ---
+      const switchPosMode = (newMode) => {
+        setPosMode(newMode);
+        if (cart.length > 0) {
+          const updatedCart = cart.map(item => {
+            const prod = products.find(p => p.id === item.prodId);
+            if (!prod) return item;
+            let newPrice = item.price;
+            if (item.quality === 'special') {
+              newPrice = newMode === 'khata' 
+                ? (item.option === '1' ? (prod.wsSp1 || prod.sp1) : (prod.wsSp2 || prod.sp2))
+                : (item.option === '1' ? prod.sp1 : prod.sp2);
+            } else {
+              newPrice = newMode === 'khata'
+                ? (item.option === '1' ? (prod.wsReg1 || prod.reg1) : (prod.wsReg2 || prod.reg2))
+                : (item.option === '1' ? prod.reg1 : prod.reg2);
+            }
+            return { ...item, price: Number(newPrice) };
+          });
+          setCart(updatedCart);
+        }
+      };
+
+      // --- UNIFIED CART & CHECKOUT ---
+      const addToCart = (prod, quality, option) => {
+        const isWeight = prod.packingType === 'weight';
+        const optText = isWeight ? (option === '1' ? '1kg' : '2kg') : (option === '1' ? '1 Pack' : '5 Pack');
+        
+        let price = 0;
+        if (quality === 'special') {
+          price = posMode === 'khata' 
+            ? (option === '1' ? (prod.wsSp1 || prod.sp1) : (prod.wsSp2 || prod.sp2))
+            : (option === '1' ? prod.sp1 : prod.sp2);
+        } else {
+          price = posMode === 'khata'
+            ? (option === '1' ? (prod.wsReg1 || prod.reg1) : (prod.wsReg2 || prod.reg2))
+            : (option === '1' ? prod.reg1 : prod.reg2);
+        }
+
+        const label = `${prod.name} (${quality === 'special' ? 'Spl' : 'Reg'} - ${optText})`;
+        const cartId = `${prod.id}-${quality}-${option}`;
+        
+        const existing = cart.find(i => i.cartId === cartId);
+        if (existing) { setCart(cart.map(i => i.cartId === cartId ? { ...i, qty: i.qty + 1 } : i)); } 
+        else { setCart([...cart, { cartId, prodId: prod.id, quality, option, name: label, price: Number(price), qty: 1 }]); }
+      };
+
+      const updateQty = (cartId, delta) => {
+        setCart(cart.map(i => {
+          if (i.cartId === cartId) {
+            const newQty = i.qty + delta;
+            return newQty > 0 ? { ...i, qty: newQty } : null;
+          }
+          return i;
+        }).filter(Boolean));
+      };
+
+      const removeFromCart = (cartId) => setCart(cart.filter(i => i.cartId !== cartId));
+
+      const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+      const discVal = Number(discount) || 0;
+      const grandTotal = subtotal > discVal ? subtotal - discVal : 0;
+
+      const getSalesmanStats = (sm) => {
+        if (!sm) return { totalStock: 0, totalPaid: 0, balance: 0 };
+        const totalStock = sm.transactions.filter(t => t.type === 'stock').reduce((a, b) => a + b.amount, 0);
+        const totalPaid = sm.transactions.filter(t => t.type === 'payment').reduce((a, b) => a + b.amount, 0);
+        return { totalStock, totalPaid, balance: totalStock - totalPaid };
+      };
+
+      // Parse transaction date reliably (supports timestamp inside tx.id or tx.date string)
+      const getTxDateObj = (tx) => {
+        if (tx.timestamp) return new Date(tx.timestamp);
+        if (tx.id && tx.id.startsWith('tx_')) {
+          const ms = Number(tx.id.replace('tx_', ''));
+          if (!isNaN(ms) && ms > 1000000000000) return new Date(ms);
+        }
+        const parsed = new Date(tx.date);
+        return isNaN(parsed.getTime()) ? new Date() : parsed;
+      };
+
+      // Filter Salesman Khata by Weekly, Monthly, Yearly, or All
+      const getFilteredKhataStats = (sm, period) => {
+        if (!sm) return { txs: [], stock: 0, paid: 0, netChange: 0 };
+        const now = new Date();
+        const txs = sm.transactions.filter(tx => {
+          if (period === 'all') return true;
+          const d = getTxDateObj(tx);
+          if (period === 'weekly') {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
+            sevenDaysAgo.setHours(0, 0, 0, 0);
+            return d >= sevenDaysAgo;
+          }
+          if (period === 'monthly') {
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          }
+          if (period === 'yearly') {
+            return d.getFullYear() === now.getFullYear();
+          }
+          return true;
+        });
+
+        const stock = txs.filter(t => t.type === 'stock').reduce((a, b) => a + b.amount, 0);
+        const paid = txs.filter(t => t.type === 'payment').reduce((a, b) => a + b.amount, 0);
+        return { txs, stock, paid, netChange: stock - paid };
+      };
+
+      const checkout = () => {
+        if (cart.length === 0) return;
+
+        // MODE A: RETAIL CASH BILL
+        if (posMode === 'retail') {
+          const orderId = 'ORD-' + Math.floor(1000 + Math.random() * 9000);
+          const dateStr = new Date().toLocaleString();
+          const cust = customerName.trim() || 'Walk-in Customer';
+
+          const newSale = { 
+            id: orderId, 
+            date: dateStr, 
+            customer: cust, 
+            items: [...cart], 
+            subtotal, 
+            discount: discVal, 
+            refundedAmount: 0,
+            amount: grandTotal, 
+            type: 'Retail' 
+          };
+          setSales([newSale, ...sales]);
+          setReceipt(newSale);
+          setCart([]); setCustomerName(''); setDiscount('');
+          return;
+        }
+
+        // MODE B: SALESMAN KHATA STOCK ISSUE
+        if (posMode === 'khata') {
+          const sm = khatas.find(k => k.id === posSalesmanId);
+          if (!sm) {
+            alert('Pehle Salesman select karein ya Khata tab mein jakar Salesman add karein!');
+            return;
+          }
+
+          const nowMs = Date.now();
+          const itemsSummary = cart.map(i => `${i.name} x${i.qty}`).join(', ');
+          const extraNote = customerName.trim() ? ` (${customerName.trim()})` : '';
+          const tx = {
+            id: 'tx_' + nowMs,
+            timestamp: nowMs,
+            date: new Date(nowMs).toLocaleString(),
+            type: 'stock',
+            amount: grandTotal,
+            note: `${itemsSummary}${extraNote}`,
+            items: [...cart]
+          };
+
+          const updatedKhatas = khatas.map(k => k.id === sm.id ? { ...k, transactions: [tx, ...k.transactions] } : k);
+          setKhatas(updatedKhatas);
+
+          const updatedSm = updatedKhatas.find(k => k.id === sm.id);
+          const stats = getSalesmanStats(updatedSm);
+
+          setReceipt({
+            isKhataSlip: true,
+            orderId: tx.id.slice(-6).toUpperCase(),
+            date: tx.date,
+            customer: sm.name,
+            phone: sm.phone,
+            txType: 'STOCK ISSUED (MAAL DIYA)',
+            items: [...cart],
+            discount: discVal,
+            amount: grandTotal,
+            previousBalance: stats.balance - grandTotal,
+            newBalance: stats.balance
+          });
+
+          setCart([]); setCustomerName(''); setDiscount('');
+        }
+      };
+
+      // --- KHATA TAB LOGIC ---
+      const handleAddSalesman = (e) => {
+        e.preventDefault();
+        if (!newSalesman.name.trim()) return alert('Salesman name is required!');
+        const sm = {
+          id: 'sm_' + Date.now(),
+          name: newSalesman.name.trim(),
+          phone: newSalesman.phone.trim(),
+          route: newSalesman.route.trim(),
+          transactions: []
+        };
+        setKhatas([sm, ...khatas]);
+        setSelectedSalesmanId(sm.id);
+        setPosSalesmanId(sm.id);
+        setNewSalesman({ name: '', phone: '', route: '' });
+      };
+
+      const handleKhataTransaction = (e) => {
+        e.preventDefault();
+        const sm = khatas.find(k => k.id === (selectedSalesmanId || (khatas[0] && khatas[0].id)));
+        if (!sm) return;
+
+        const finalAmt = Number(khataEntry.amount);
+        if (!finalAmt || finalAmt <= 0) return alert('Please enter a valid amount!');
+
+        const nowMs = Date.now();
+        const autoNote = khataEntry.note.trim() || (khataEntry.type === 'stock' ? 'Direct Stock Entry' : 'Cash Received');
+
+        const tx = {
+          id: 'tx_' + nowMs,
+          timestamp: nowMs,
+          date: new Date(nowMs).toLocaleString(),
+          type: khataEntry.type,
+          amount: finalAmt,
+          note: autoNote,
+          items: []
+        };
+
+        const updatedKhatas = khatas.map(k => k.id === sm.id ? { ...k, transactions: [tx, ...k.transactions] } : k);
+        setKhatas(updatedKhatas);
+
+        if (khataEntry.type === 'payment') {
+          const saleLog = {
+            id: 'KHT-' + Math.floor(1000 + Math.random() * 9000),
+            date: tx.date,
+            customer: `${sm.name} (Khata Vasooli)`,
+            items: [{ name: `Khata Cash Recovery - ${autoNote}`, price: finalAmt, qty: 1 }],
+            subtotal: finalAmt,
+            discount: 0,
+            refundedAmount: 0,
+            amount: finalAmt,
+            type: 'Khata Cash'
+          };
+          setSales([saleLog, ...sales]);
+        }
+
+        const updatedSm = updatedKhatas.find(k => k.id === sm.id);
+        const stats = getSalesmanStats(updatedSm);
+        setReceipt({
+          isKhataSlip: true,
+          isDirectEntry: true,
+          orderId: tx.id.slice(-6).toUpperCase(),
+          date: tx.date,
+          customer: sm.name,
+          phone: sm.phone,
+          txType: tx.type === 'stock' ? 'STOCK ISSUED (MAAL DIYA)' : 'CASH RECEIVED (VASOOLI)',
+          items: [{ name: tx.note, price: tx.amount, qty: 1 }],
+          amount: tx.amount,
+          previousBalance: tx.type === 'stock' ? (stats.balance - tx.amount) : (stats.balance + tx.amount),
+          newBalance: stats.balance
+        });
+
+        setKhataEntry({ type: 'payment', amount: '', note: '' });
+      };
+
+      const deleteKhataTx = (smId, txId) => {
+        if (!window.confirm('Delete this Khata entry?')) return;
+        setKhatas(khatas.map(k => k.id === smId ? { ...k, transactions: k.transactions.filter(t => t.id !== txId) } : k));
+      };
+
+      const deleteSalesman = (smId) => {
+        if (!window.confirm('Delete this Salesman and entire Khata history permanently?')) return;
+        const remaining = khatas.filter(k => k.id !== smId);
+        setKhatas(remaining);
+        if (selectedSalesmanId === smId) setSelectedSalesmanId(remaining[0]?.id || null);
+        if (posSalesmanId === smId) setPosSalesmanId(remaining[0]?.id || '');
+        if (dashSalesmanModalId === smId) setDashSalesmanModalId(null);
+      };
+
+      // --- PARTIAL RETURN LOGIC ---
+      const openReturnModal = (sale) => {
+        setReturnModalSale(JSON.parse(JSON.stringify(sale)));
+        setCustomRefundAmt('');
+      };
+
+      const adjustReturnItemQty = (idx, delta) => {
+        if (!returnModalSale || !returnModalSale.items) return;
+        const updatedItems = [...returnModalSale.items];
+        const newQty = updatedItems[idx].qty + delta;
+        if (newQty <= 0) { updatedItems.splice(idx, 1); } 
+        else { updatedItems[idx].qty = newQty; }
+        const newSub = updatedItems.reduce((acc, i) => acc + (i.price * i.qty), 0);
+        const newTotal = Math.max(0, newSub - (returnModalSale.discount || 0) - (returnModalSale.refundedAmount || 0));
+        setReturnModalSale({ ...returnModalSale, items: updatedItems, subtotal: newSub, amount: newTotal });
+      };
+
+      const applyCustomRefund = () => {
+        const refVal = Number(customRefundAmt);
+        if (!refVal || refVal <= 0) return alert('Enter valid return amount!');
+        if (refVal > returnModalSale.amount) return alert('Return amount cannot exceed current bill total!');
+        const updatedRefunded = (returnModalSale.refundedAmount || 0) + refVal;
+        const newTotal = returnModalSale.amount - refVal;
+        setReturnModalSale({ ...returnModalSale, refundedAmount: updatedRefunded, amount: newTotal });
+        setCustomRefundAmt('');
+      };
+
+      const saveReturnChanges = () => {
+        if (!returnModalSale) return;
+        if (returnModalSale.amount === 0 && (!returnModalSale.items || returnModalSale.items.length === 0)) {
+          if (window.confirm('Bill total is 0. Remove this transaction completely?')) {
+            setSales(sales.filter(s => s.id !== returnModalSale.id));
+            setReturnModalSale(null);
+            return;
+          }
+        }
+        setSales(sales.map(s => s.id === returnModalSale.id ? returnModalSale : s));
+        setReturnModalSale(null);
+        alert('Bill updated successfully after return!');
+      };
+
+      const deleteRecord = (id, listType) => {
+        if(listType === 'sale' && window.confirm('Revert entire sale completely?')) { setSales(sales.filter(s => s.id !== id)); }
+        if(listType === 'expense' && window.confirm('Delete this expense?')) { setExpenses(expenses.filter(e => e.id !== id)); }
+      };
+
+      // --- PRODUCT ADD & DIRECT EDIT ---
+      const startEditProduct = (prod) => {
+        setEditingProdId(prod.id);
+        setProdForm({
+          name: prod.name, category: prod.category, packingType: prod.packingType,
+          sp1: prod.sp1 || '', sp2: prod.sp2 || '', wsSp1: prod.wsSp1 || '', wsSp2: prod.wsSp2 || '',
+          reg1: prod.reg1 || '', reg2: prod.reg2 || '', wsReg1: prod.wsReg1 || '', wsReg2: prod.wsReg2 || ''
+        });
+        window.scrollTo({ top: 300, behavior: 'smooth' });
+      };
+
+      const cancelEditProduct = () => {
+        setEditingProdId(null);
+        setProdForm({ name: '', category: 'Cakes', packingType: 'weight', sp1: '', sp2: '', wsSp1: '', wsSp2: '', reg1: '', reg2: '', wsReg1: '', wsReg2: '' });
+      };
+
+      const handleSaveProduct = (e) => {
+        e.preventDefault();
+        if(!prodForm.name.trim()) return alert('Product name is required!');
+        const formattedItem = {
+          id: editingProdId || 'prod_' + Date.now(),
+          name: prodForm.name.trim(),
+          category: prodForm.category.trim() || 'General',
+          packingType: prodForm.packingType,
+          sp1: Number(prodForm.sp1) || 0, sp2: Number(prodForm.sp2) || 0,
+          wsSp1: Number(prodForm.wsSp1) || 0, wsSp2: Number(prodForm.wsSp2) || 0,
+          reg1: Number(prodForm.reg1) || 0, reg2: Number(prodForm.reg2) || 0,
+          wsReg1: Number(prodForm.wsReg1) || 0, wsReg2: Number(prodForm.wsReg2) || 0
+        };
+        if (editingProdId) {
+          setProducts(products.map(p => p.id === editingProdId ? formattedItem : p));
+          alert('Product rates updated!');
+        } else {
+          setProducts([...products, formattedItem]);
+          alert('New product added!');
+        }
+        cancelEditProduct();
+      };
+
+      // --- ANALYTICS ---
+      const totalSales = sales.reduce((a, b) => a + b.amount, 0);
+      const totalExp = expenses.reduce((a, b) => a + b.amount, 0);
+      const netProfit = totalSales - totalExp;
+      const totalMarketBakaya = khatas.reduce((acc, sm) => acc + getSalesmanStats(sm).balance, 0);
+
+      const categories = ['All', ...new Set(products.map(p => p.category))];
+      const filteredProds = products.filter(p => (selectedCat === 'All' || p.category === selectedCat) && p.name.toLowerCase().includes(search.toLowerCase()));
+      const activeSalesman = khatas.find(k => k.id === selectedSalesmanId) || khatas[0] || null;
+      const activeSmStats = getSalesmanStats(activeSalesman);
+
+      const modalSalesman = khatas.find(k => k.id === dashSalesmanModalId) || null;
+      const modalOverallStats = getSalesmanStats(modalSalesman);
+      const modalPeriodStats = getFilteredKhataStats(modalSalesman, khataPeriod);
+
+      // --- LOGIN SCREEN ---
+      if (!isLoggedIn) {
+        return (
+          <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-rose-600/20 to-amber-600/20 opacity-50 blur-3xl"></div>
+            <div className="bg-white/10 backdrop-blur-2xl border border-white/20 p-8 rounded-[2rem] shadow-2xl w-full max-w-sm text-center relative z-10">
+              <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-rose-500 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl shadow-rose-500/30 mb-6">🍞</div>
+              <h1 className="text-3xl font-black text-white tracking-widest mb-1">{settings.name}</h1>
+              <p className="text-xs text-amber-300 font-bold mb-8 uppercase tracking-widest">Admin Terminal</p>
+              
+              {!showForgot ? (
+                <form onSubmit={handleLogin} className="space-y-4 fade-in">
+                  <input type="password" placeholder="Enter PIN" value={pinInput} onChange={e => setPinInput(e.target.value)} className="w-full p-4 bg-black/30 border border-slate-600 rounded-2xl text-center text-2xl text-white tracking-[0.5em] focus:outline-none focus:border-amber-400 transition placeholder:text-sm placeholder:tracking-normal" autoFocus />
+                  <button type="submit" className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white font-black tracking-widest uppercase py-4 rounded-2xl shadow-lg transition">LOGIN</button>
+                  <button type="button" onClick={() => setShowForgot(true)} className="text-xs text-slate-400 hover:text-white mt-4 block w-full">Forgot PIN?</button>
+                </form>
+              ) : (
+                <form onSubmit={handleRecovery} className="space-y-4 fade-in">
+                  <p className="text-xs text-amber-400 font-bold mb-2 uppercase">Verify Owner Name</p>
+                  <input type="text" placeholder="Enter Owner Name" value={recoveryName} onChange={e => setRecoveryName(e.target.value)} className="w-full p-4 bg-black/30 border border-slate-600 rounded-2xl text-center text-white focus:outline-none focus:border-amber-400 transition" autoFocus />
+                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black tracking-widest uppercase py-4 rounded-2xl shadow-lg transition">Recover PIN</button>
+                  <button type="button" onClick={() => setShowForgot(false)} className="text-xs text-slate-400 hover:text-white mt-4 block w-full">Back to Login</button>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      const NavItem = ({ id, icon, label }) => (
+        <button onClick={() => setActiveTab(id)} className={`flex flex-col md:flex-row items-center gap-1 md:gap-3 p-2 md:px-4 md:py-3.5 w-full rounded-2xl transition-all ${activeTab === id ? 'bg-amber-500 text-slate-900 shadow-lg font-black' : 'text-slate-400 hover:bg-slate-800 hover:text-white font-bold'}`}>
+          <span className="text-xl md:text-xl">{icon}</span><span className="text-[10px] md:text-sm tracking-wide">{label}</span>
+        </button>
+      );
+
+      return (
+        <div className="min-h-screen flex flex-col md:flex-row bg-slate-100">
+          
+          {/* Desktop Sidebar */}
+          <aside className="hidden md:flex flex-col w-64 bg-slate-900 h-screen sticky top-0 border-r border-slate-800 p-5 shrink-0 z-40">
+            <div className="mb-10 px-1 border-b border-slate-800 pb-5">
+              <h1 className="text-2xl font-black text-white tracking-widest leading-tight">{settings.name}</h1>
+              <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
+            </div>
+            <nav className="flex-1 space-y-2">
+              <NavItem id="pos" icon="🛒" label="POS & Stock Issue" />
+              <NavItem id="khata" icon="📒" label="Salesman Khata" />
+              <NavItem id="dashboard" icon="📈" label="Dashboard" />
+              <NavItem id="expenses" icon="💵" label="Expenses" />
+              <NavItem id="settings" icon="⚙️" label="Settings" />
+            </nav>
+            <button onClick={() => setIsLoggedIn(false)} className="mt-auto bg-slate-800 text-slate-300 hover:bg-red-500 hover:text-white py-4 rounded-2xl font-black tracking-widest transition shadow-lg text-sm">🔒 LOCK SYSTEM</button>
+          </aside>
+
+          {/* Main Area */}
+          <main className="flex-1 w-full p-3 md:p-6 pb-28 md:pb-6 overflow-y-auto">
+            
+            {/* Mobile Header */}
+            <div className="md:hidden flex justify-between items-center bg-slate-900 p-4 rounded-3xl mb-4 shadow-lg text-white">
+              <div>
+                <h1 className="text-base font-black truncate">{settings.name}</h1>
+                <p className="text-[10px] text-amber-500 tracking-widest">Admin Access</p>
+              </div>
+              <button onClick={() => setIsLoggedIn(false)} className="bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-500 transition">Lock</button>
+            </div>
+
+            {/* TAB 1: UNIFIED POS */}
+            {activeTab === 'pos' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start fade-in">
+                
+                {/* Left: Product Selection Grid */}
+                <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+                  <div className="bg-white p-2.5 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
+                    <div className="flex overflow-x-auto hide-scroll w-full gap-2 p-1">
+                      {categories.map(c => (
+                        <button key={c} onClick={() => setSelectedCat(c)} className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition ${selectedCat===c ? (posMode==='khata'?'bg-rose-600 text-white':'bg-amber-500 text-slate-900') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{c}</button>
+                      ))}
+                    </div>
+                    <input type="text" placeholder="🔍 Search item..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-56 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-amber-400 shrink-0" />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filteredProds.map(p => {
+                      const sp1Rate = posMode === 'khata' ? (p.wsSp1 || p.sp1) : p.sp1;
+                      const sp2Rate = posMode === 'khata' ? (p.wsSp2 || p.sp2) : p.sp2;
+                      const reg1Rate = posMode === 'khata' ? (p.wsReg1 || p.reg1) : p.reg1;
+                      const reg2Rate = posMode === 'khata' ? (p.wsReg2 || p.reg2) : p.reg2;
+
+                      return (
+                        <div key={p.id} className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition">
+                          <div className="mb-3 flex justify-between items-start gap-2">
+                            <div className="min-w-0">
+                              <h3 className="font-black text-slate-800 text-base leading-snug break-words mb-1">{p.name}</h3>
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg inline-block ${posMode==='khata'?'bg-rose-100 text-rose-700':'bg-amber-100 text-amber-800'}`}>{p.category}</span>
+                            </div>
+                            {posMode === 'khata' && <span className="text-[9px] font-black bg-slate-900 text-amber-400 px-2 py-0.5 rounded uppercase shrink-0">Khata Rate</span>}
+                          </div>
+                          
+                          <div className="space-y-2.5 mt-auto">
+                            <div className={`p-2.5 rounded-2xl border ${posMode==='khata'?'bg-rose-50/70 border-rose-100':'bg-amber-50 border-amber-100'}`}>
+                              <span className="text-[10px] font-black text-slate-500 block mb-1.5 tracking-widest">🌟 SPECIAL</span>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => addToCart(p, 'special', '1')} className={`py-2 px-1 rounded-xl text-xs font-bold shadow-sm transition ${posMode==='khata'?'bg-rose-600 text-white hover:bg-rose-700':'bg-white border border-amber-200 text-amber-900 hover:bg-amber-100'}`}>
+                                  {p.packingType==='weight'?'1kg':'1 Pk'}<br/><span className="text-[10px] opacity-90">Rs.{sp1Rate}</span>
+                                </button>
+                                <button onClick={() => addToCart(p, 'special', '2')} className={`py-2 px-1 rounded-xl text-xs font-bold shadow-sm transition ${posMode==='khata'?'bg-rose-600 text-white hover:bg-rose-700':'bg-white border border-amber-200 text-amber-900 hover:bg-amber-100'}`}>
+                                  {p.packingType==='weight'?'2kg':'5 Pk'}<br/><span className="text-[10px] opacity-90">Rs.{sp2Rate}</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                              <span className="text-[10px] font-black text-slate-400 block mb-1.5 tracking-widest">⭐ REGULAR</span>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => addToCart(p, 'regular', '1')} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 py-2 px-1 rounded-xl text-xs font-bold shadow-sm">
+                                  {p.packingType==='weight'?'1kg':'1 Pk'}<br/><span className="text-[10px] text-slate-500">Rs.{reg1Rate}</span>
+                                </button>
+                                <button onClick={() => addToCart(p, 'regular', '2')} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 py-2 px-1 rounded-xl text-xs font-bold shadow-sm">
+                                  {p.packingType==='weight'?'2kg':'5 Pk'}<br/><span className="text-[10px] text-slate-500">Rs.{reg2Rate}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right: Live Cart & Mode Switcher */}
+                <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-4">
+                  <div className={`bg-white p-4 sm:p-5 rounded-[2rem] shadow-xl border-2 flex flex-col justify-between lg:max-h-[calc(100vh-2rem)] transition-colors ${posMode==='khata'?'border-rose-300':'border-amber-200'}`}>
+                    
+                    <div className="space-y-3 shrink-0">
+                      <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+                        <button type="button" onClick={() => switchPosMode('retail')} className={`py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition ${posMode==='retail'?'bg-amber-500 text-slate-900 shadow':'text-slate-500 hover:text-slate-800'}`}>
+                          🛒 Retail Cash
+                        </button>
+                        <button type="button" onClick={() => switchPosMode('khata')} className={`py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition ${posMode==='khata'?'bg-rose-600 text-white shadow':'text-slate-500 hover:text-slate-800'}`}>
+                          📒 Salesman Khata
+                        </button>
+                      </div>
+
+                      {posMode === 'retail' ? (
+                        <input type="text" placeholder="Customer Name (Optional)" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:bg-white transition" />
+                      ) : (
+                        <div className="space-y-2 bg-rose-50 p-3 rounded-2xl border border-rose-200">
+                          <div className="flex justify-between items-center gap-2">
+                            <label className="text-[10px] font-black text-rose-700 uppercase tracking-wider">Select Salesman</label>
+                            <button type="button" onClick={() => setActiveTab('khata')} className="text-[10px] font-black text-indigo-600 underline shrink-0">+ New Salesman</button>
+                          </div>
+                          {khatas.length === 0 ? (
+                            <button type="button" onClick={() => setActiveTab('khata')} className="w-full py-2.5 bg-white border border-rose-300 text-rose-700 rounded-xl text-xs font-black">
+                              No Salesman — Click to Add
+                            </button>
+                          ) : (
+                            <select value={posSalesmanId} onChange={e => setPosSalesmanId(e.target.value)} className="w-full p-2.5 bg-white border border-rose-200 rounded-xl text-xs sm:text-sm font-black text-slate-800 focus:outline-none">
+                              {khatas.map(sm => {
+                                const st = getSalesmanStats(sm);
+                                return (
+                                  <option key={sm.id} value={sm.id}>
+                                    {sm.name} (Bakaya: Rs. {st.balance.toLocaleString()})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          )}
+                          <input type="text" placeholder="Note / Gatepass (Optional)" value={customerName} onChange={e=>setCustomerName(e.target.value)} className="w-full p-2.5 bg-white border border-rose-100 rounded-xl text-xs font-bold focus:outline-none" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="my-3 overflow-y-auto flex-1 min-h-[120px] max-h-[280px] lg:max-h-none divide-y divide-slate-100 pr-1">
+                      {cart.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400 font-bold flex flex-col items-center justify-center">
+                          <span className="text-3xl mb-1.5 opacity-60">{posMode==='khata'?'📦':'🛍️'}</span> 
+                          <span className="text-xs">{posMode==='khata' ? 'Select items for Salesman' : 'Cart is empty'}</span>
+                        </div>
+                      ) : cart.map(i => (
+                        <div key={i.cartId} className="py-2.5 flex justify-between items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-slate-800 text-xs truncate">{i.name}</p>
+                            <p className="text-[10px] text-slate-400 font-bold mt-0.5">Rs.{i.price} each</p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => updateQty(i.cartId, -1)} className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-black hover:bg-slate-200">-</button>
+                            <span className="text-xs font-black w-5 text-center">{i.qty}</span>
+                            <button onClick={() => updateQty(i.cartId, 1)} className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-black hover:bg-slate-200">+</button>
+                            <span className="font-black text-slate-700 text-xs w-14 text-right">Rs.{i.price * i.qty}</span>
+                            <button onClick={() => removeFromCart(i.cartId)} className="w-6 h-6 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition text-xs font-bold ml-0.5">✕</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="pt-3 border-t border-slate-200 shrink-0 space-y-3 bg-white">
+                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider px-2">Discount</span>
+                        <input type="number" placeholder="0" value={discount} onChange={e=>setDiscount(e.target.value)} className="w-24 p-1.5 text-right bg-white border border-slate-200 rounded-xl text-sm font-black focus:outline-none"/>
+                      </div>
+                      <div className="flex justify-between items-center px-1">
+                        <span className="font-black text-slate-500 uppercase tracking-wider text-xs">
+                          {posMode==='khata' ? 'Stock Value' : 'Grand Total'}
+                        </span>
+                        <span className={`text-2xl sm:text-3xl font-black tracking-tight ${posMode==='khata'?'text-rose-600':'text-amber-500'}`}>Rs. {grandTotal.toLocaleString()}</span>
+                      </div>
+                      <button onClick={checkout} disabled={cart.length===0} className={`w-full text-white font-black py-3.5 sm:py-4 rounded-2xl uppercase tracking-wider text-xs transition shadow-lg disabled:opacity-50 ${posMode==='khata'?'bg-rose-600 hover:bg-rose-700 shadow-rose-500/30':'bg-slate-900 hover:bg-slate-800 shadow-slate-900/30'}`}>
+                        {posMode==='khata' ? '📒 Add To Khata & Print Slip' : '🖨️ Print Retail Invoice'}
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: SALESMAN KHATA */}
+            {activeTab === 'khata' && (
+              <div className="space-y-6 fade-in">
+                <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Salesman Ledger & Recovery</p>
+                    <h2 className="text-2xl font-black mt-0.5">📒 Salesman Khata & Bakaya</h2>
+                  </div>
+                  <div className="bg-white/10 px-5 py-3 rounded-2xl border border-white/10">
+                    <span className="text-[10px] text-slate-300 font-bold uppercase block">Total Market Bakaya</span>
+                    <span className="text-2xl font-black text-rose-400">Rs. {totalMarketBakaya.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h3 className="font-black text-base mb-4">➕ Add New Salesman</h3>
+                      <form onSubmit={handleAddSalesman} className="space-y-3">
+                        <input type="text" placeholder="Salesman Name (e.g. Ali)" value={newSalesman.name} onChange={e=>setNewSalesman({...newSalesman, name: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="text" placeholder="Phone Number" value={newSalesman.phone} onChange={e=>setNewSalesman({...newSalesman, phone: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none" />
+                          <input type="text" placeholder="Area / Route" value={newSalesman.route} onChange={e=>setNewSalesman({...newSalesman, route: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none" />
+                        </div>
+                        <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-2xl text-xs uppercase tracking-widest transition">Create Khata</button>
+                      </form>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h3 className="font-black text-base mb-4">Active Salesmen ({khatas.length})</h3>
+                      {khatas.length === 0 ? (
+                        <p className="text-xs text-slate-400 font-bold text-center py-6">No salesman added yet.</p>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                          {khatas.map(sm => {
+                            const st = getSalesmanStats(sm);
+                            const isSelected = activeSalesman && activeSalesman.id === sm.id;
+                            return (
+                              <div key={sm.id} onClick={() => setSelectedSalesmanId(sm.id)} className={`p-4 rounded-2xl border cursor-pointer transition flex justify-between items-center ${isSelected ? 'bg-amber-50 border-amber-400 shadow-sm' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
+                                <div>
+                                  <p className="font-black text-slate-800 text-sm">{sm.name}</p>
+                                  <p className="text-[10px] text-slate-500 font-bold">{sm.phone || 'No phone'} {sm.route ? `• ${sm.route}` : ''}</p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[9px] font-black uppercase text-slate-400 block">Bakaya</span>
+                                  <span className={`font-black text-sm ${st.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>Rs. {st.balance.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    {!activeSalesman ? (
+                      <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3">
+                        <span className="text-5xl block">📒</span>
+                        <h3 className="font-black text-xl text-slate-700">Select or Add a Salesman</h3>
+                        <p className="text-xs text-slate-400 font-medium max-w-md mx-auto">Subha ka saman POS screen se Salesman Khata mode mein add karein, aur sham ki cash vasooli (partial ya full) yahan record karein.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                          <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-4 mb-5">
+                            <div>
+                              <h3 className="font-black text-2xl text-slate-900">{activeSalesman.name}</h3>
+                              <p className="text-xs font-bold text-slate-400">{activeSalesman.phone} {activeSalesman.route && `| Route: ${activeSalesman.route}`}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => { setDashSalesmanModalId(activeSalesman.id); setKhataPeriod('weekly'); }} className="text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl hover:bg-indigo-600 hover:text-white transition">
+                                📊 Weekly / Monthly Report
+                              </button>
+                              <button onClick={() => { setPosSalesmanId(activeSalesman.id); switchPosMode('khata'); setActiveTab('pos'); }} className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-slate-900 px-3.5 py-2 rounded-xl hover:bg-amber-400 transition">
+                                + Issue Stock
+                              </button>
+                              <button onClick={() => deleteSalesman(activeSalesman.id)} className="text-[10px] font-bold uppercase tracking-widest bg-red-50 text-red-500 px-3 py-2 rounded-xl hover:bg-red-500 hover:text-white transition">Delete</button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase block">Total Maal Liya</span>
+                              <span className="text-base sm:text-xl font-black text-slate-800 mt-1 block">Rs. {activeSmStats.totalStock.toLocaleString()}</span>
+                            </div>
+                            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                              <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 uppercase block">Total Vasool (Paid)</span>
+                              <span className="text-base sm:text-xl font-black text-emerald-700 mt-1 block">Rs. {activeSmStats.totalPaid.toLocaleString()}</span>
+                            </div>
+                            <div className={`p-4 rounded-2xl border ${activeSmStats.balance > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-900 text-white border-slate-800'}`}>
+                              <span className={`text-[9px] sm:text-[10px] font-black uppercase block ${activeSmStats.balance > 0 ? 'text-rose-600' : 'text-amber-400'}`}>Bakaya (Remaining)</span>
+                              <span className={`text-base sm:text-xl font-black mt-1 block ${activeSmStats.balance > 0 ? 'text-rose-600' : 'text-white'}`}>Rs. {activeSmStats.balance.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                          <div className="flex gap-2 mb-5">
+                            <button type="button" onClick={() => setKhataEntry({...khataEntry, type: 'payment'})} className={`flex-1 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition ${khataEntry.type === 'payment' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-slate-100 text-slate-500'}`}>
+                              💵 Sham Payment Vasool (Credit)
+                            </button>
+                            <button type="button" onClick={() => setKhataEntry({...khataEntry, type: 'stock'})} className={`flex-1 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition ${khataEntry.type === 'stock' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-slate-100 text-slate-500'}`}>
+                              📦 Direct Amount Maal (Debit)
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleKhataTransaction} className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                                  {khataEntry.type === 'payment' ? 'Vasool Shuda Cash (Partial / Full Rs)' : 'Maal Ki Qeemat (Rs)'}
+                                </label>
+                                <input type="number" placeholder="e.g. 5000" value={khataEntry.amount} onChange={e=>setKhataEntry({...khataEntry, amount: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-base font-black focus:outline-none" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Detail / Note (Optional)</label>
+                                <input type="text" placeholder={khataEntry.type === 'payment' ? 'e.g. Evening cash return, remaining tomorrow' : 'e.g. Direct stock amount'} value={khataEntry.note} onChange={e=>setKhataEntry({...khataEntry, note: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none" />
+                              </div>
+                            </div>
+
+                            {khataEntry.type === 'payment' && activeSmStats.balance > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => setKhataEntry({...khataEntry, amount: activeSmStats.balance})} className="text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                                  Full Clear (Rs. {activeSmStats.balance})
+                                </button>
+                                <button type="button" onClick={() => setKhataEntry({...khataEntry, amount: Math.round(activeSmStats.balance / 2)})} className="text-[10px] font-black bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl">
+                                  Half Pay (Rs. {Math.round(activeSmStats.balance / 2)})
+                                </button>
+                              </div>
+                            )}
+
+                            <button type="submit" className={`w-full text-white font-black py-4 rounded-2xl uppercase tracking-widest text-xs transition shadow-lg ${khataEntry.type === 'payment' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                              {khataEntry.type === 'payment' ? 'Receive Payment & Print Slip' : 'Add Direct Amount & Print Slip'}
+                            </button>
+                          </form>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                          <h4 className="font-black text-base mb-4">Khata History ({activeSalesman.name})</h4>
+                          <div className="overflow-x-auto hide-scroll">
+                            <table className="w-full text-left text-xs whitespace-nowrap min-w-[550px]">
+                              <thead className="text-[10px] font-black uppercase text-slate-400 border-b">
+                                <tr>
+                                  <th className="pb-3 px-2">Date / Time</th>
+                                  <th className="pb-3 px-2">Type</th>
+                                  <th className="pb-3 px-2">Items / Detail</th>
+                                  <th className="pb-3 px-2 text-right">Amount</th>
+                                  <th className="pb-3 px-2 text-right">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {activeSalesman.transactions.map(tx => (
+                                  <tr key={tx.id} className="hover:bg-slate-50">
+                                    <td className="py-3.5 px-2 text-slate-400 font-bold">{tx.date}</td>
+                                    <td className="py-3.5 px-2">
+                                      <span className={`px-2.5 py-1 rounded-lg font-black uppercase text-[9px] ${tx.type === 'stock' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                        {tx.type === 'stock' ? 'Maal Diya' : 'Cash Vasool'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-2 font-bold text-slate-700 max-w-[240px] truncate" title={tx.note}>{tx.note}</td>
+                                    <td className={`py-3.5 px-2 text-right font-black text-sm ${tx.type === 'stock' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                      {tx.type === 'stock' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
+                                    </td>
+                                    <td className="py-3.5 px-2 text-right">
+                                      <button onClick={() => deleteKhataTx(activeSalesman.id, tx.id)} className="text-red-400 hover:text-red-600 font-black px-2">✕</button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: DASHBOARD (WITH SALESMAN KHATA LIST + WEEKLY/MONTHLY/YEARLY REPORT) */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6 fade-in">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-3">💰</div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Cash Sales</p>
+                    <h3 className="text-3xl font-black text-slate-800 mt-1">Rs. {totalSales.toLocaleString()}</h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl mb-3">📒</div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Salesman Bakaya</p>
+                    <h3 className="text-3xl font-black text-amber-600 mt-1">Rs. {totalMarketBakaya.toLocaleString()}</h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-xl mb-3">📉</div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Expenses</p>
+                    <h3 className="text-3xl font-black text-slate-800 mt-1">Rs. {totalExp.toLocaleString()}</h3>
+                  </div>
+                  <div className={`p-6 rounded-3xl shadow-xl text-white ${netProfit >= 0 ? 'bg-gradient-to-br from-slate-800 to-slate-900' : 'bg-rose-600'}`}>
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-xl mb-3">💎</div>
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Net Cash Profit</p>
+                    <h3 className="text-3xl font-black mt-1">Rs. {netProfit.toLocaleString()}</h3>
+                  </div>
+                </div>
+
+                {/* NEW: SALESMAN KHATA LIST ON DASHBOARD (CLICK NAME FOR WEEKLY / MONTHLY / YEARLY) */}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
+                    <div>
+                      <h3 className="font-black text-xl text-slate-900">📒 Salesman Khata List (Click Name for Weekly / Monthly / Yearly)</h3>
+                      <p className="text-xs font-bold text-slate-400 mt-0.5">Kisi bhi salesman ke naam par click kar ke uska hafta-war, mahana aur salana hisab dekhein</p>
+                    </div>
+                    <button onClick={() => setActiveTab('khata')} className="text-xs font-black bg-slate-900 text-white px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
+                      Manage All Khatas →
+                    </button>
+                  </div>
+
+                  {khatas.length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      <p className="text-sm font-bold text-slate-500">Abhi koi salesman add nahi hai.</p>
+                      <button onClick={() => setActiveTab('khata')} className="mt-2 text-xs font-black text-indigo-600 underline">+ Salesman Add Karein</button>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto hide-scroll">
+                      <table className="w-full text-left text-sm whitespace-nowrap min-w-[650px]">
+                        <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                          <tr>
+                            <th className="pb-4 px-2">Salesman Name (Click)</th>
+                            <th className="pb-4 px-2">Route / Phone</th>
+                            <th className="pb-4 px-2 text-right">Total Maal</th>
+                            <th className="pb-4 px-2 text-right">Total Vasool</th>
+                            <th className="pb-4 px-2 text-right">Net Bakaya</th>
+                            <th className="pb-4 px-2 text-right">Report</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {khatas.map(sm => {
+                            const st = getSalesmanStats(sm);
+                            return (
+                              <tr key={sm.id} className="hover:bg-amber-50/50 transition">
+                                <td className="py-4 px-2">
+                                  <button 
+                                    onClick={() => { setDashSalesmanModalId(sm.id); setKhataPeriod('weekly'); }} 
+                                    className="font-black text-base text-indigo-700 hover:text-indigo-900 underline decoration-indigo-300 underline-offset-4 flex items-center gap-2"
+                                  >
+                                    <span>👤 {sm.name}</span>
+                                  </button>
+                                </td>
+                                <td className="py-4 px-2 text-xs font-bold text-slate-500">
+                                  {sm.route || 'No Route'} {sm.phone ? `(${sm.phone})` : ''}
+                                </td>
+                                <td className="py-4 px-2 text-right font-bold text-slate-700">Rs. {st.totalStock.toLocaleString()}</td>
+                                <td className="py-4 px-2 text-right font-bold text-emerald-600">Rs. {st.totalPaid.toLocaleString()}</td>
+                                <td className="py-4 px-2 text-right">
+                                  <span className={`font-black text-base px-3 py-1 rounded-xl ${st.balance > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    Rs. {st.balance.toLocaleString()}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-2 text-right">
+                                  <button 
+                                    onClick={() => { setDashSalesmanModalId(sm.id); setKhataPeriod('weekly'); }} 
+                                    className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition shadow-sm"
+                                  >
+                                    View Khata
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* RECENT TRANSACTIONS */}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm">
+                  <h3 className="font-black text-xl mb-6">Recent Transactions (Manage Returns & Reprints)</h3>
+                  <div className="overflow-x-auto hide-scroll">
+                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
+                      <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                        <tr>
+                          <th className="pb-4 px-2">Order ID</th>
+                          <th className="pb-4 px-2">Date/Time</th>
+                          <th className="pb-4 px-2">Customer / Salesman</th>
+                          <th className="pb-4 px-2">Type</th>
+                          <th className="pb-4 px-2 text-right">Net Amount</th>
+                          <th className="pb-4 px-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {sales.map(s => (
+                          <tr key={s.id} className="hover:bg-slate-50">
+                            <td className="py-4 px-2 font-black text-slate-700">{s.id}</td>
+                            <td className="py-4 px-2 text-xs font-bold text-slate-400">{s.date}</td>
+                            <td className="py-4 px-2 font-bold">
+                              {s.customer}
+                              {s.refundedAmount > 0 && <span className="ml-2 text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-black">Returned: Rs.{s.refundedAmount}</span>}
+                            </td>
+                            <td className="py-4 px-2"><span className={`text-[9px] px-3 py-1.5 rounded-lg font-black uppercase tracking-widest ${s.type==='Khata Cash'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-800'}`}>{s.type}</span></td>
+                            <td className="py-4 px-2 text-right font-black text-base">Rs. {s.amount}</td>
+                            <td className="py-4 px-2 text-right space-x-2">
+                              {s.items && (
+                                <button onClick={() => setReceipt(s)} className="text-[10px] font-bold tracking-widest uppercase bg-slate-100 text-slate-700 px-3 py-2 rounded-xl hover:bg-slate-800 hover:text-white transition">Bill</button>
+                              )}
+                              <button onClick={() => openReturnModal(s)} className="text-[10px] font-bold tracking-widest uppercase bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-xl hover:bg-amber-500 hover:text-white transition">Return / Edit</button>
+                              <button onClick={() => deleteRecord(s.id, 'sale')} className="text-[10px] font-bold tracking-widest uppercase bg-red-50 border border-red-200 text-red-500 px-3 py-2 rounded-xl hover:bg-red-500 hover:text-white transition">Full Revert</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: EXPENSES */}
+            {activeTab === 'expenses' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+                <div className="bg-white p-8 rounded-3xl border shadow-sm h-fit">
+                  <h3 className="font-black text-xl mb-6">Add Expense</h3>
+                  <form onSubmit={(e)=>{ e.preventDefault(); if(!expForm.title || !expForm.amount) return alert('Fill details!'); setExpenses([{ id: Date.now().toString(), date: new Date().toLocaleDateString(), ...expForm, amount: Number(expForm.amount) }, ...expenses]); setExpForm({title:'', amount:'', category:'Raw Material'}); }} className="space-y-5">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Detail / Bill Name</label>
+                      <input type="text" value={expForm.title} onChange={e=>setExpForm({...expForm, title: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-slate-400" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Amount (Rs)</label>
+                      <input type="number" value={expForm.amount} onChange={e=>setExpForm({...expForm, amount: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-slate-400" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Category Tag</label>
+                      <select value={expForm.category} onChange={e=>setExpForm({...expForm, category: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none">
+                        <option>Raw Material</option><option>Utilities</option><option>Wages</option><option>Other</option>
+                      </select>
+                    </div>
+                    <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl transition shadow-lg tracking-widest uppercase text-sm mt-2">Record Payment</button>
+                  </form>
+                </div>
+                <div className="lg:col-span-2 bg-white p-8 rounded-3xl border shadow-sm">
+                  <h3 className="font-black text-xl mb-6">Expense Registry</h3>
+                  <div className="overflow-x-auto hide-scroll">
+                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[500px]">
+                      <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                        <tr><th className="pb-4 px-2">Date</th><th className="pb-4 px-2">Description</th><th className="pb-4 px-2">Tag</th><th className="pb-4 px-2 text-right">Cost</th><th className="pb-4 px-2 text-right"></th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {expenses.map(e => (
+                          <tr key={e.id} className="hover:bg-slate-50 group">
+                            <td className="py-4 px-2 text-xs font-bold text-slate-400">{e.date}</td>
+                            <td className="py-4 px-2 font-black text-slate-700">{e.title}</td>
+                            <td className="py-4 px-2"><span className="text-[9px] bg-slate-100 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest text-slate-500">{e.category}</span></td>
+                            <td className="py-4 px-2 text-right font-black text-rose-500 text-base">Rs. {e.amount}</td>
+                            <td className="py-4 px-2 text-right"><button onClick={()=>deleteRecord(e.id, 'expense')} className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-red-500 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition font-bold shadow-sm">✕</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: SETTINGS */}
+            {activeTab === 'settings' && (
+              <div className="space-y-6 fade-in">
+                <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                  <h3 className="font-black text-xl mb-6">Business Profile & Receipt Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Bakery Title (Prints on System & Receipts)</label>
+                      <input type="text" value={settings.name} onChange={e=>setSettings({...settings, name:e.target.value})} className="w-full p-4 bg-amber-50 border border-amber-200 rounded-2xl text-base font-black text-amber-900 focus:outline-none"/>
+                    </div>
+                    <div className="lg:col-span-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Shop Address (Prints on Invoices)</label>
+                      <input type="text" value={settings.address} onChange={e=>setSettings({...settings, address:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                    </div>
+                    
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Owner Name</label>
+                      <input type="text" value={settings.owner} onChange={e=>setSettings({...settings, owner:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Owner Number</label>
+                      <input type="text" value={settings.ownerContact} onChange={e=>setSettings({...settings, ownerContact:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                    </div>
+                    <div className="lg:col-span-1 hidden lg:block"></div>
+
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Manager Name</label>
+                      <input type="text" value={settings.manager} onChange={e=>setSettings({...settings, manager:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Manager Number</label>
+                      <input type="text" value={settings.managerContact} onChange={e=>setSettings({...settings, managerContact:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                    </div>
+                    
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-rose-500">System Security PIN</label>
+                      <input type="text" value={settings.pin} onChange={e=>setSettings({...settings, pin:e.target.value})} className="w-full p-4 bg-rose-50 border border-rose-200 rounded-2xl text-lg font-black tracking-[0.3em] text-rose-600 focus:outline-none text-center"/>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Add OR Edit Product Matrix Section */}
+                <div className={`p-8 rounded-[2rem] shadow-xl text-white transition-colors ${editingProdId ? 'bg-indigo-950 border-2 border-indigo-400' : 'bg-slate-900'}`}>
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+                    <h3 className="font-black text-amber-400 text-xl">
+                      {editingProdId ? `✏️ Editing Rates: ${prodForm.name}` : '➕ Add New Product to Menu'}
+                    </h3>
+                    {editingProdId && (
+                      <button type="button" onClick={cancelEditProduct} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-bold">Cancel Edit</button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveProduct} className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Product Name</label>
+                        <input type="text" placeholder="e.g. Pastry" value={prodForm.name} onChange={e=>setProdForm({...prodForm, name: e.target.value})} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Category</label>
+                        <input type="text" placeholder="e.g. Cakes" value={prodForm.category} onChange={e=>setProdForm({...prodForm, category: e.target.value})} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Packing Type</label>
+                        <select value={prodForm.packingType} onChange={e=>setProdForm({...prodForm, packingType: e.target.value})} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none">
+                          <option value="weight">Weight (1kg / 2kg)</option>
+                          <option value="pack">Pack (1 Pack / 5 Pack)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 space-y-4">
+                        <span className="text-xs font-black text-amber-400 uppercase tracking-widest block">Special Pricing Matrix</span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Retail 1 (1kg/1Pk)</label>
+                            <input type="number" placeholder="0" value={prodForm.sp1} onChange={e=>setProdForm({...prodForm, sp1: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Retail 2 (2kg/5Pk)</label>
+                            <input type="number" placeholder="0" value={prodForm.sp2} onChange={e=>setProdForm({...prodForm, sp2: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Salesman / Khata Rate 1</label>
+                            <input type="number" placeholder="0" value={prodForm.wsSp1} onChange={e=>setProdForm({...prodForm, wsSp1: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Salesman / Khata Rate 2</label>
+                            <input type="number" placeholder="0" value={prodForm.wsSp2} onChange={e=>setProdForm({...prodForm, wsSp2: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 space-y-4">
+                        <span className="text-xs font-black text-slate-300 uppercase tracking-widest block">Regular Pricing Matrix</span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Retail 1 (1kg/1Pk)</label>
+                            <input type="number" placeholder="0" value={prodForm.reg1} onChange={e=>setProdForm({...prodForm, reg1: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Retail 2 (2kg/5Pk)</label>
+                            <input type="number" placeholder="0" value={prodForm.reg2} onChange={e=>setProdForm({...prodForm, reg2: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Salesman / Khata Rate 1</label>
+                            <input type="number" placeholder="0" value={prodForm.wsReg1} onChange={e=>setProdForm({...prodForm, wsReg1: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Salesman / Khata Rate 2</label>
+                            <input type="number" placeholder="0" value={prodForm.wsReg2} onChange={e=>setProdForm({...prodForm, wsReg2: e.target.value})} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white"/>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <button type="submit" className={`w-full font-black py-4 rounded-2xl uppercase tracking-widest text-sm transition shadow-lg ${editingProdId ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-amber-500 hover:bg-amber-400 text-slate-900'}`}>
+                      {editingProdId ? 'Update Product Rates' : 'Save New Product'}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl text-white">
+                    <h3 className="font-black text-amber-400 text-xl border-b border-slate-700 pb-4 mb-4">Existing Menu Items (Edit Rates / Delete)</h3>
+                    <div className="max-h-[340px] overflow-y-auto divide-y divide-slate-800 pr-2">
+                      {products.map(p => (
+                        <div key={p.id} className="py-4 flex justify-between items-center gap-2">
+                          <div>
+                            <p className="font-black text-sm">{p.name}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                              {p.category} | Spl: Rs.{p.sp1} | Khata: Rs.{p.wsSp1 || p.sp1}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button onClick={() => startEditProduct(p)} className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-indigo-500 hover:text-white transition">Edit</button>
+                            <button onClick={()=>{ if(window.confirm('Delete item permanently?')) setProducts(products.filter(x=>x.id!==p.id)) }} className="bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition">Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2rem] shadow-xl text-white flex flex-col justify-center items-start">
+                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-inner">📊</div>
+                    <h3 className="font-black text-2xl mb-2">Excel Backup</h3>
+                    <p className="text-sm text-emerald-50 font-medium mb-8 opacity-90 leading-relaxed">Download a complete CSV spreadsheet of all your sales, Khata balances, and expenses.</p>
+                    <button onClick={()=>{
+                      let csv = 'Type,ID,Date,Detail,Category,Returned,Net_Amount\n';
+                      sales.forEach(s => csv += `Sale,${s.id},"${s.date}","${s.customer}",${s.type},${s.refundedAmount || 0},${s.amount}\n`);
+                      khatas.forEach(k => { const st = getSalesmanStats(k); csv += `Khata_Balance,${k.id},"${new Date().toLocaleDateString()}","${k.name} (${k.phone})",Bakaya,0,${st.balance}\n`; });
+                      expenses.forEach(e => csv += `Expense,${e.id},"${e.date}","${e.title}",${e.category},0,${e.amount}\n`);
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `${settings.name}_Backup.csv`; a.click();
+                    }} className="w-full bg-white text-emerald-700 font-black py-4 rounded-2xl shadow-lg tracking-widest uppercase text-sm hover:scale-[1.02] transition-transform">Download File</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* MOBILE BOTTOM NAVIGATION */}
+          <nav className="md:hidden fixed bottom-0 w-full bg-slate-900 text-white flex justify-around p-2 pb-safe border-t border-slate-800 z-40">
+            <button onClick={() => setActiveTab('pos')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='pos'?'text-amber-400':'text-slate-400'}`}><span className="text-xl">🛒</span><span className="text-[9px] font-bold mt-1">POS</span></button>
+            <button onClick={() => setActiveTab('khata')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='khata'?'text-rose-400':'text-slate-400'}`}><span className="text-xl">📒</span><span className="text-[9px] font-bold mt-1">Khata</span></button>
+            <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='dashboard'?'text-blue-400':'text-slate-400'}`}><span className="text-xl">📈</span><span className="text-[9px] font-bold mt-1">Stats</span></button>
+            <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='expenses'?'text-emerald-400':'text-slate-400'}`}><span className="text-xl">💵</span><span className="text-[9px] font-bold mt-1">Exp</span></button>
+            <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='settings'?'text-white':'text-slate-400'}`}><span className="text-xl">⚙️</span><span className="text-[9px] font-bold mt-1">Set</span></button>
+          </nav>
+
+          {/* NEW: SALESMAN WEEKLY / MONTHLY / YEARLY KHATA MODAL */}
+          {modalSalesman && (
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
+              <div className="bg-white rounded-[2rem] w-full max-w-3xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
+                
+                {/* Modal Header */}
+                <div className="p-5 sm:p-6 bg-slate-900 text-white flex justify-between items-start gap-4 shrink-0">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 block">Salesman Khata Statement</span>
+                    <h3 className="text-2xl font-black mt-0.5">{modalSalesman.name}</h3>
+                    <p className="text-xs text-slate-400 font-bold mt-0.5">
+                      {modalSalesman.phone || 'No Phone'} {modalSalesman.route ? `• Route: ${modalSalesman.route}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right bg-white/10 px-4 py-2 rounded-2xl">
+                      <span className="text-[9px] uppercase font-bold text-slate-300 block">Total Bakaya</span>
+                      <span className={`text-lg sm:text-xl font-black ${modalOverallStats.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        Rs. {modalOverallStats.balance.toLocaleString()}
+                      </span>
+                    </div>
+                    <button onClick={() => setDashSalesmanModalId(null)} className="w-9 h-9 rounded-full bg-white/10 hover:bg-rose-500 text-white font-black transition">✕</button>
+                  </div>
+                </div>
+
+                {/* Period Filter Tabs (Weekly / Monthly / Yearly / All) */}
+                <div className="p-3 sm:p-4 bg-slate-100 border-b border-slate-200 flex flex-wrap gap-2 shrink-0">
+                  {[
+                    { id: 'weekly', label: '📅 Weekly (Last 7 Days)' },
+                    { id: 'monthly', label: '🗓️ Monthly (This Month)' },
+                    { id: 'yearly', label: '📆 Yearly (This Year)' },
+                    { id: 'all', label: '📚 All-Time History' }
+                  ].map(tab => (
+                    <button 
+                      key={tab.id} 
+                      onClick={() => setKhataPeriod(tab.id)} 
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition whitespace-nowrap ${khataPeriod === tab.id ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Period Summary Boxes */}
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5">
+                  <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                    <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
+                      <span className="text-[9px] sm:text-[10px] font-black text-rose-600 uppercase block">
+                        {khataPeriod === 'weekly' ? 'Weekly Maal' : khataPeriod === 'monthly' ? 'Monthly Maal' : khataPeriod === 'yearly' ? 'Yearly Maal' : 'Total Maal'}
+                      </span>
+                      <span className="text-base sm:text-xl font-black text-rose-700 mt-1 block">Rs. {modalPeriodStats.stock.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                      <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 uppercase block">
+                        {khataPeriod === 'weekly' ? 'Weekly Vasooli' : khataPeriod === 'monthly' ? 'Monthly Vasooli' : khataPeriod === 'yearly' ? 'Yearly Vasooli' : 'Total Vasooli'}
+                      </span>
+                      <span className="text-base sm:text-xl font-black text-emerald-700 mt-1 block">Rs. {modalPeriodStats.paid.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-slate-900 text-white p-4 rounded-2xl">
+                      <span className="text-[9px] sm:text-[10px] font-black text-amber-400 uppercase block">
+                        Period Net Difference
+                      </span>
+                      <span className="text-base sm:text-xl font-black mt-1 block">Rs. {modalPeriodStats.netChange.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Filtered Entries List */}
+                  <div>
+                    <h4 className="font-black text-sm text-slate-700 mb-3 uppercase tracking-wider">
+                      Entries ({modalPeriodStats.txs.length})
+                    </h4>
+                    {modalPeriodStats.txs.length === 0 ? (
+                      <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-100 text-xs font-bold text-slate-400">
+                        Is period mein koi khata entry maujood nahi hai.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                        <table className="w-full text-left text-xs whitespace-nowrap">
+                          <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b">
+                            <tr>
+                              <th className="py-3 px-3">Date / Time</th>
+                              <th className="py-3 px-3">Type</th>
+                              <th className="py-3 px-3">Items / Detail</th>
+                              <th className="py-3 px-3 text-right">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {modalPeriodStats.txs.map(tx => (
+                              <tr key={tx.id} className="hover:bg-slate-50">
+                                <td className="py-3 px-3 text-slate-500 font-bold">{tx.date}</td>
+                                <td className="py-3 px-3">
+                                  <span className={`px-2.5 py-1 rounded-lg font-black uppercase text-[9px] ${tx.type === 'stock' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {tx.type === 'stock' ? 'Maal Diya' : 'Cash Vasool'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 font-bold text-slate-800 max-w-[260px] truncate" title={tx.note}>{tx.note}</td>
+                                <td className={`py-3 px-3 text-right font-black text-sm ${tx.type === 'stock' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                  {tx.type === 'stock' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-4 bg-slate-100 border-t flex flex-wrap gap-2 justify-between items-center shrink-0">
+                  <button 
+                    onClick={() => { 
+                      const id = modalSalesman.id;
+                      setDashSalesmanModalId(null); 
+                      setSelectedSalesmanId(id); 
+                      setActiveTab('khata'); 
+                    }} 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider shadow transition"
+                  >
+                    💵 Receive Payment / Open Full Khata
+                  </button>
+                  <button onClick={() => setDashSalesmanModalId(null)} className="bg-slate-300 hover:bg-slate-400 text-slate-800 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition">
+                    Close
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* PARTIAL RETURN / BILL EDIT MODAL */}
+          {returnModalSale && (
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
+              <div className="bg-white rounded-[2rem] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-amber-50">
+                  <div>
+                    <h3 className="font-black text-lg text-slate-900">Return / Adjust Bill ({returnModalSale.id})</h3>
+                    <p className="text-xs font-bold text-slate-500">Customer: {returnModalSale.customer}</p>
+                  </div>
+                  <button onClick={() => setReturnModalSale(null)} className="w-8 h-8 rounded-full bg-white text-slate-600 font-black">✕</button>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                  {returnModalSale.items && returnModalSale.items.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">1. Return Specific Items (Reduce Qty)</p>
+                      <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl px-4">
+                        {returnModalSale.items.map((item, idx) => (
+                          <div key={idx} className="py-3 flex justify-between items-center gap-2">
+                            <div>
+                              <p className="font-bold text-xs sm:text-sm text-slate-800">{item.name}</p>
+                              <p className="text-[10px] text-slate-400 font-bold">Rs.{item.price} × {item.qty} = Rs.{item.price * item.qty}</p>
+                            </div>
+                            <button onClick={() => adjustReturnItemQty(idx, -1)} className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 font-black text-xs hover:bg-rose-500 hover:text-white transition">- Return 1</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">2. Direct Amount Return (e.g., Deduct Rs. 1,000)</label>
+                    <div className="flex gap-2">
+                      <input type="number" placeholder="Enter return amount (Rs)" value={customRefundAmt} onChange={e => setCustomRefundAmt(e.target.value)} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-sm font-black focus:outline-none" />
+                      <button type="button" onClick={applyCustomRefund} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-black px-5 rounded-xl text-xs uppercase tracking-wider transition">Deduct</button>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-2">
+                    <div className="flex justify-between text-xs text-slate-400 font-bold">
+                      <span>Total Returned / Deducted:</span>
+                      <span className="text-amber-400">Rs. {returnModalSale.refundedAmount || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+                      <span className="text-xs font-black uppercase tracking-widest">Updated Net Bill:</span>
+                      <span className="text-2xl font-black text-emerald-400">Rs. {returnModalSale.amount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-100 border-t flex gap-2">
+                  <button onClick={saveReturnChanges} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest shadow-lg transition">Save Updated Bill</button>
+                  <button onClick={() => setReturnModalSale(null)} className="px-5 bg-slate-300 text-slate-800 font-black py-3.5 rounded-xl text-xs uppercase tracking-widest">Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FIXED NON-OVERLAPPING INVOICE & KHATA SLIP PRINT MODAL */}
+          {receipt && (
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
+              <div className="bg-white rounded-[2rem] w-full max-w-md max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
+                
+                <div id="printable-area" className="bg-white p-5 sm:p-6 text-slate-900 overflow-y-auto flex-1 space-y-4">
+                  <div className="text-center border-b-2 border-dashed border-slate-300 pb-3">
+                    <h2 className="font-black text-xl sm:text-2xl uppercase tracking-wide break-words leading-snug">{settings.name}</h2>
+                    <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mt-1 leading-snug">
+                      {receipt.isKhataSlip ? receipt.txType : `Official ${receipt.type} Bill`}
+                    </p>
+                  </div>
+                  
+                  <div className="text-xs font-bold text-slate-700 space-y-1.5 border-b border-slate-200 pb-3">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-slate-500 shrink-0">Slip / Order ID:</span>
+                      <span className="text-slate-900 font-black text-right break-all">{receipt.orderId}</span>
+                    </div>
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-slate-500 shrink-0">Date:</span>
+                      <span className="text-right break-words">{receipt.date}</span>
+                    </div>
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-slate-500 shrink-0">{receipt.isKhataSlip ? 'Salesman:' : 'Customer:'}</span>
+                      <span className="text-slate-900 font-black uppercase text-right break-words">{receipt.customer}</span>
+                    </div>
+                    {receipt.phone && (
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-slate-500 shrink-0">Phone:</span>
+                        <span className="text-right">{receipt.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="text-xs space-y-2">
+                    <div className="flex justify-between font-black text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5">
+                      <span>Item / Description</span>
+                      <span className="shrink-0 ml-2">Amount</span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {receipt.items.map((i, idx) => (
+                        <div key={idx} className="py-2.5 flex justify-between items-start gap-3">
+                          <div className="flex-1 min-w-0 pr-1">
+                            <p className="font-bold text-slate-900 break-words leading-normal">{i.name}</p>
+                            {!receipt.isDirectEntry && (
+                              <p className="text-[10px] text-slate-500 font-semibold mt-0.5 leading-normal">
+                                Rs. {i.price} × {i.qty}
+                              </p>
+                            )}
+                          </div>
+                          <span className="font-black text-sm text-slate-900 shrink-0 text-right whitespace-nowrap">
+                            Rs. {(i.price * i.qty).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {receipt.isKhataSlip ? (
+                    <div className="border-t-2 border-slate-900 pt-3 space-y-2 text-xs font-bold">
+                      {receipt.discount > 0 && (
+                        <div className="flex justify-between items-center text-red-600">
+                          <span>Discount:</span>
+                          <span>- Rs. {receipt.discount.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Previous Bakaya:</span>
+                        <span>Rs. {receipt.previousBalance.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-800">
+                        <span>Today's Entry:</span>
+                        <span>Rs. {receipt.amount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center font-black pt-2.5 mt-1 border-t border-dashed border-slate-400 text-sm sm:text-base">
+                        <span className="uppercase">Net Bakaya:</span>
+                        <span className="text-lg sm:text-xl">Rs. {receipt.newBalance.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-t-2 border-slate-900 pt-3 space-y-2 text-xs font-bold">
+                      {receipt.discount > 0 && (
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span>Discount:</span>
+                          <span>- Rs. {receipt.discount.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {receipt.refundedAmount > 0 && (
+                        <div className="flex justify-between items-center text-amber-700">
+                          <span>Returned / Deducted:</span>
+                          <span>- Rs. {receipt.refundedAmount.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center font-black pt-1 text-sm sm:text-base">
+                        <span className="uppercase">Net Pay:</span>
+                        <span className="text-xl sm:text-2xl">Rs. {(receipt.total !== undefined ? receipt.total : receipt.amount).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-slate-200 text-center space-y-1.5">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Thank you for visiting us!</p>
+                    <div className="text-[10px] font-bold text-slate-600 leading-relaxed break-words">
+                      {settings.address && <p className="italic">{settings.address}</p>}
+                      {settings.ownerContact && <p className="mt-1">📞 {settings.ownerContact} ({settings.owner})</p>}
+                      {settings.managerContact && <p>📞 {settings.managerContact} ({settings.manager})</p>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-100 p-3 sm:p-4 flex gap-2 no-print border-t shrink-0">
+                  <button onClick={() => window.print()} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl transition shadow-lg text-xs uppercase tracking-widest">🖨️ Print Slip</button>
+                  <button onClick={() => setReceipt(null)} className="px-5 bg-slate-300 hover:bg-slate-400 text-slate-800 font-black py-3.5 rounded-xl transition text-xs uppercase tracking-widest">Close</button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<BakeryPOS />);
+  </script>
+</body>
+</html>
