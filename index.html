@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bakery POS & Khata System</title>
+  <title>DAN BAKERS — POS & Khata Suite</title>
   
+  <!-- Browser Tab Favicon (Golden Biscuit with DAN) -->
+  <link id="dynamic-favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230B1120'/%3E%3Ccircle cx='50' cy='50' r='38' fill='%23d97706' stroke='%23fbbf24' stroke-width='4' stroke-dasharray='8 4'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23f59e0b'/%3E%3Ctext x='50' y='57' text-anchor='middle' font-family='Arial, sans-serif' font-weight='900' font-size='22' fill='%23451a03' letter-spacing='1'%3EDAN%3C/text%3E%3C/svg%3E" />
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & ReactDOM CDN -->
@@ -14,11 +17,10 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
-    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3f6fa; }
     
-    /* Fixed Print CSS Logic - Zero Text Overlapping */
     @media print {
       @page { margin: 4mm; }
       html, body { 
@@ -59,7 +61,13 @@
     .hide-scroll::-webkit-scrollbar { display: none; }
     
     .fade-in { animation: fadeIn 0.25s ease-in-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .toast-slide { animation: toastSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes toastSlide {
+      from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
   </style>
 </head>
 <body class="text-slate-800">
@@ -67,11 +75,39 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
+
+    const DEFAULT_SETTINGS = {
+      name: 'DAN BAKERS',
+      address: 'Kot Sai Singh (Jhang)',
+      owner: 'Muhammad Touseef',
+      ownerContact: '0370-0549734',
+      ownerUsername: 'touseef',
+      ownerPin: '5555',
+      ownerSecurityKey: 'DAN-OWN-88',
+      manager: 'Tayyab',
+      managerContact: '0312-5505874',
+      managerUsername: 'tayyab',
+      pin: '1234',
+      managerSecurityKey: 'DAN-MGR-99',
+      logoUrl: ''
+    };
 
     const getStore = (key, defaultVal) => {
-      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : defaultVal; } 
-      catch (e) { return defaultVal; }
+      try {
+        const v = localStorage.getItem(key);
+        if (!v) return defaultVal;
+        const parsed = JSON.parse(v);
+        if (key === 'bakery_settings' && typeof parsed === 'object' && parsed !== null) {
+          return { ...defaultVal, ...parsed };
+        }
+        if (Array.isArray(defaultVal) && !Array.isArray(parsed)) {
+          return defaultVal;
+        }
+        return parsed;
+      } catch (e) {
+        return defaultVal;
+      }
     };
 
     const initialProducts = [
@@ -80,42 +116,99 @@
       { id: '3', name: 'Crunchy Special Rusk', category: 'Rusk', packingType: 'pack', sp1: 250, sp2: 1200, wsSp1: 210, wsSp2: 1000, reg1: 180, reg2: 850, wsReg1: 150, wsReg2: 720 }
     ];
 
+    // Custom Biscuit Logo with "DAN" Engraved Inside
+    const BrandLogo = ({ size = "md", customLogoUrl = "" }) => {
+      const dims = size === "lg" ? "w-24 h-24" : size === "sm" ? "w-10 h-10" : "w-12 h-12";
+      if (customLogoUrl && customLogoUrl.trim()) {
+        return (
+          <img 
+            src={customLogoUrl.trim()} 
+            alt="DAN Biscuit Logo" 
+            className={`${dims} rounded-full object-cover border-2 border-amber-400 shadow-lg shrink-0 bg-white`} 
+          />
+        );
+      }
+      return (
+        <div className={`${dims} shrink-0 flex items-center justify-center drop-shadow-[0_6px_14px_rgba(245,158,11,0.35)]`}>
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            <defs>
+              <radialGradient id="biscuitGrad" cx="35%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="#fde68a" />
+                <stop offset="45%" stopColor="#f59e0b" />
+                <stop offset="85%" stopColor="#b45309" />
+                <stop offset="100%" stopColor="#78350f" />
+              </radialGradient>
+              <linearGradient id="rimGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#fef3c7" />
+                <stop offset="100%" stopColor="#92400e" />
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="44" fill="url(#biscuitGrad)" stroke="url(#rimGrad)" strokeWidth="4" strokeDasharray="7 3.5" />
+            <circle cx="50" cy="50" r="35" fill="none" stroke="#78350f" strokeWidth="1.8" strokeOpacity="0.6" />
+            <circle cx="50" cy="50" r="32" fill="none" stroke="#fef3c7" strokeWidth="1" strokeOpacity="0.5" />
+            <circle cx="50" cy="24" r="2.2" fill="#78350f" opacity="0.75" />
+            <circle cx="36" cy="28" r="2" fill="#78350f" opacity="0.75" />
+            <circle cx="64" cy="28" r="2" fill="#78350f" opacity="0.75" />
+            <circle cx="50" cy="76" r="2.2" fill="#78350f" opacity="0.75" />
+            <circle cx="36" cy="72" r="2" fill="#78350f" opacity="0.75" />
+            <circle cx="64" cy="72" r="2" fill="#78350f" opacity="0.75" />
+            <text x="50" y="57" textAnchor="middle" fontFamily="'Plus Jakarta Sans', Arial, sans-serif" fontWeight="900" fontSize="24" fill="#451a03" letterSpacing="1.5">
+              DAN
+            </text>
+            <text x="50" y="56" textAnchor="middle" fontFamily="'Plus Jakarta Sans', Arial, sans-serif" fontWeight="900" fontSize="24" fill="#fef3c7" fillOpacity="0.35" letterSpacing="1.5">
+              DAN
+            </text>
+          </svg>
+        </div>
+      );
+    };
+
     function BakeryPOS() {
-      // --- STATES ---
-      const [isLoggedIn, setIsLoggedIn] = useState(false);
+      const [userRole, setUserRole] = useState(null);
+      const [loginRoleSelect, setLoginRoleSelect] = useState('manager');
+      const [loginIdInput, setLoginIdInput] = useState('');
       const [pinInput, setPinInput] = useState('');
+      const [showPin, setShowPin] = useState(false);
+      const [loginError, setLoginError] = useState('');
+
+      // Simple Security Key Forgot States
       const [showForgot, setShowForgot] = useState(false);
-      const [recoveryName, setRecoveryName] = useState('');
+      const [keyRole, setKeyRole] = useState('manager');
+      const [securityKeyInput, setSecurityKeyInput] = useState('');
+      const [newPinInput, setNewPinInput] = useState('');
+      const [keyError, setKeyError] = useState('');
+
+      // Modern Toast Notification State
+      const [toast, setToast] = useState(null);
+      const toastTimerRef = useRef(null);
+
+      const showNotify = (message, type = 'success') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        const titles = {
+          success: 'Saved & Updated',
+          error: 'Attention Required',
+          info: 'System Update'
+        };
+        setToast({ message, type, title: titles[type] || 'Notification' });
+        toastTimerRef.current = setTimeout(() => {
+          setToast(null);
+        }, 3500);
+      };
+
       const [activeTab, setActiveTab] = useState('pos');
-      
-      // Global Business Settings
-      const [settings, setSettings] = useState(() => getStore('bakery_settings', {
-        name: 'BAN BAKERS',
-        address: 'Kot Sai Singh (Jhang)',
-        owner: 'Muhammad Touseef',
-        ownerContact: '0370-0549734',
-        manager: 'Tayyab',
-        managerContact: '0312-5505874',
-        pin: '1234'
-      }));
-
-      useEffect(() => { document.title = `${settings.name} - POS & Khata`; }, [settings.name]);
-
+      const [settings, setSettings] = useState(() => getStore('bakery_settings', DEFAULT_SETTINGS));
       const [products, setProducts] = useState(() => getStore('bakery_products', initialProducts));
       const [sales, setSales] = useState(() => getStore('bakery_sales', []));
       const [expenses, setExpenses] = useState(() => getStore('bakery_expenses', []));
-      
-      // Salesman Khata State
       const [khatas, setKhatas] = useState(() => getStore('bakery_khatas', []));
+
       const [selectedSalesmanId, setSelectedSalesmanId] = useState(null);
       const [newSalesman, setNewSalesman] = useState({ name: '', phone: '', route: '' });
       const [khataEntry, setKhataEntry] = useState({ type: 'payment', amount: '', note: '' });
 
-      // Dashboard Salesman Report Modal State (Weekly / Monthly / Yearly)
       const [dashSalesmanModalId, setDashSalesmanModalId] = useState(null);
-      const [khataPeriod, setKhataPeriod] = useState('weekly'); // 'weekly' | 'monthly' | 'yearly' | 'all'
+      const [khataPeriod, setKhataPeriod] = useState('weekly');
 
-      // Unified POS States
       const [posMode, setPosMode] = useState('retail');
       const [posSalesmanId, setPosSalesmanId] = useState('');
       const [cart, setCart] = useState([]);
@@ -127,44 +220,126 @@
       const [receipt, setReceipt] = useState(null);
       const [expForm, setExpForm] = useState({ title: '', amount: '', category: 'Raw Material' });
 
-      // Product Form + Edit Mode
       const [editingProdId, setEditingProdId] = useState(null);
       const [prodForm, setProdForm] = useState({ name: '', category: 'Cakes', packingType: 'weight', sp1: '', sp2: '', wsSp1: '', wsSp2: '', reg1: '', reg2: '', wsReg1: '', wsReg2: '' });
 
-      // Partial Return Modal State
       const [returnModalSale, setReturnModalSale] = useState(null);
       const [customRefundAmt, setCustomRefundAmt] = useState('');
 
-      // Auto-save Data
+      // Dynamic Title
+      useEffect(() => {
+        document.title = `${settings.name} — POS & Khata`;
+      }, [settings.name]);
+
+      // Auto-save LocalStorage
       useEffect(() => { localStorage.setItem('bakery_settings', JSON.stringify(settings)); }, [settings]);
       useEffect(() => { localStorage.setItem('bakery_products', JSON.stringify(products)); }, [products]);
       useEffect(() => { localStorage.setItem('bakery_sales', JSON.stringify(sales)); }, [sales]);
       useEffect(() => { localStorage.setItem('bakery_expenses', JSON.stringify(expenses)); }, [expenses]);
       useEffect(() => { localStorage.setItem('bakery_khatas', JSON.stringify(khatas)); }, [khatas]);
 
+      // Keep posSalesmanId synced
       useEffect(() => {
-        if (!posSalesmanId && khatas.length > 0) {
+        if (khatas.length === 0) {
+          if (posSalesmanId) setPosSalesmanId('');
+          return;
+        }
+        if (!khatas.some(k => k.id === posSalesmanId)) {
           setPosSalesmanId(khatas[0].id);
         }
       }, [khatas, posSalesmanId]);
 
-      // --- AUTHENTICATION ---
+      const isManager = userRole === 'manager';
+      const isOwner = userRole === 'owner';
+
+      const normalizePhone = (ph) => {
+        let digits = (ph || '').replace(/[^0-9]/g, '');
+        if (digits.startsWith('92') && digits.length === 12) digits = '0' + digits.slice(2);
+        return digits;
+      };
+
+      // Simple Login (Accepts Username OR Phone Number + Password)
       const handleLogin = (e) => {
         e.preventDefault();
-        if (pinInput === settings.pin || pinInput === '7860') { 
-          setIsLoggedIn(true); setPinInput(''); setShowForgot(false);
-        } else { alert('Incorrect Security PIN!'); }
+        setLoginError('');
+
+        const enteredId = loginIdInput.trim().toLowerCase();
+        const enteredDigits = normalizePhone(loginIdInput);
+        const enteredPin = pinInput.trim();
+
+        if (!enteredId || !enteredPin) {
+          setLoginError('Username/Number aur Password dono likhein!');
+          return;
+        }
+
+        if (loginRoleSelect === 'manager') {
+          const validUser = (settings.managerUsername || 'tayyab').trim().toLowerCase();
+          const validPhone = normalizePhone(settings.managerContact);
+          const validPin = (settings.pin || '1234').trim();
+
+          const idMatch = enteredId === validUser || (enteredDigits && enteredDigits === validPhone);
+          if (idMatch && enteredPin === validPin) {
+            setUserRole('manager');
+            setActiveTab('pos');
+            setLoginIdInput('');
+            setPinInput('');
+            showNotify('Manager Portal Unlocked!', 'success');
+          } else {
+            setLoginError('Manager Username/Number ya Password ghalat hai!');
+          }
+        } else {
+          const validUser = (settings.ownerUsername || 'touseef').trim().toLowerCase();
+          const validPhone = normalizePhone(settings.ownerContact);
+          const validPin = (settings.ownerPin || '5555').trim();
+
+          const idMatch = enteredId === validUser || (enteredDigits && enteredDigits === validPhone);
+          if (idMatch && enteredPin === validPin) {
+            setUserRole('owner');
+            setActiveTab('dashboard');
+            setLoginIdInput('');
+            setPinInput('');
+            showNotify('Owner Dashboard Opened!', 'success');
+          } else {
+            setLoginError('Owner Username/Number ya Password ghalat hai!');
+          }
+        }
       };
 
-      const handleRecovery = (e) => {
+      // Instant Security Key Unlock & Reset
+      const handleSecurityKeyUnlock = (e) => {
         e.preventDefault();
-        if (recoveryName.trim().toLowerCase() === settings.owner.trim().toLowerCase()) {
-          alert(`Authentication Successful!\nYour current PIN is: ${settings.pin}`);
-          setShowForgot(false); setRecoveryName('');
-        } else { alert('Security Check Failed! Owner name does not match.'); }
+        setKeyError('');
+
+        const enteredKey = securityKeyInput.trim();
+        const validKey = keyRole === 'manager' 
+          ? (settings.managerSecurityKey || 'DAN-MGR-99').trim() 
+          : (settings.ownerSecurityKey || 'DAN-OWN-88').trim();
+
+        if (!enteredKey || enteredKey !== validKey) {
+          setKeyError('Security Key ghalat hai! Sahi Master Security Key lagayein.');
+          return;
+        }
+
+        if (newPinInput.trim()) {
+          if (keyRole === 'manager') {
+            setSettings(prev => ({ ...prev, pin: newPinInput.trim() }));
+          } else {
+            setSettings(prev => ({ ...prev, ownerPin: newPinInput.trim() }));
+          }
+          showNotify('Password updated & system unlocked!', 'success');
+        } else {
+          showNotify('Security Key verified! System unlocked.', 'success');
+        }
+
+        setUserRole(keyRole);
+        setActiveTab(keyRole === 'manager' ? 'pos' : 'dashboard');
+        setShowForgot(false);
+        setSecurityKeyInput('');
+        setNewPinInput('');
+        setKeyError('');
       };
 
-      // --- SWITCH POS MODE ---
+      // POS Mode Switch
       const switchPosMode = (newMode) => {
         setPosMode(newMode);
         if (cart.length > 0) {
@@ -187,8 +362,9 @@
         }
       };
 
-      // --- UNIFIED CART & CHECKOUT ---
+      // Cart Actions
       const addToCart = (prod, quality, option) => {
+        if (!isManager) return;
         const isWeight = prod.packingType === 'weight';
         const optText = isWeight ? (option === '1' ? '1kg' : '2kg') : (option === '1' ? '1 Pack' : '5 Pack');
         
@@ -228,13 +404,12 @@
       const grandTotal = subtotal > discVal ? subtotal - discVal : 0;
 
       const getSalesmanStats = (sm) => {
-        if (!sm) return { totalStock: 0, totalPaid: 0, balance: 0 };
-        const totalStock = sm.transactions.filter(t => t.type === 'stock').reduce((a, b) => a + b.amount, 0);
-        const totalPaid = sm.transactions.filter(t => t.type === 'payment').reduce((a, b) => a + b.amount, 0);
+        if (!sm || !Array.isArray(sm.transactions)) return { totalStock: 0, totalPaid: 0, balance: 0 };
+        const totalStock = sm.transactions.filter(t => t.type === 'stock').reduce((a, b) => a + Number(b.amount || 0), 0);
+        const totalPaid = sm.transactions.filter(t => t.type === 'payment').reduce((a, b) => a + Number(b.amount || 0), 0);
         return { totalStock, totalPaid, balance: totalStock - totalPaid };
       };
 
-      // Parse transaction date reliably (supports timestamp inside tx.id or tx.date string)
       const getTxDateObj = (tx) => {
         if (tx.timestamp) return new Date(tx.timestamp);
         if (tx.id && tx.id.startsWith('tx_')) {
@@ -245,9 +420,8 @@
         return isNaN(parsed.getTime()) ? new Date() : parsed;
       };
 
-      // Filter Salesman Khata by Weekly, Monthly, Yearly, or All
       const getFilteredKhataStats = (sm, period) => {
-        if (!sm) return { txs: [], stock: 0, paid: 0, netChange: 0 };
+        if (!sm || !Array.isArray(sm.transactions)) return { txs: [], stock: 0, paid: 0, netChange: 0 };
         const now = new Date();
         const txs = sm.transactions.filter(tx => {
           if (period === 'all') return true;
@@ -267,15 +441,14 @@
           return true;
         });
 
-        const stock = txs.filter(t => t.type === 'stock').reduce((a, b) => a + b.amount, 0);
-        const paid = txs.filter(t => t.type === 'payment').reduce((a, b) => a + b.amount, 0);
+        const stock = txs.filter(t => t.type === 'stock').reduce((a, b) => a + Number(b.amount || 0), 0);
+        const paid = txs.filter(t => t.type === 'payment').reduce((a, b) => a + Number(b.amount || 0), 0);
         return { txs, stock, paid, netChange: stock - paid };
       };
 
       const checkout = () => {
-        if (cart.length === 0) return;
+        if (!isManager || cart.length === 0) return;
 
-        // MODE A: RETAIL CASH BILL
         if (posMode === 'retail') {
           const orderId = 'ORD-' + Math.floor(1000 + Math.random() * 9000);
           const dateStr = new Date().toLocaleString();
@@ -295,14 +468,14 @@
           setSales([newSale, ...sales]);
           setReceipt(newSale);
           setCart([]); setCustomerName(''); setDiscount('');
+          showNotify(`Retail Bill ${orderId} created!`, 'success');
           return;
         }
 
-        // MODE B: SALESMAN KHATA STOCK ISSUE
         if (posMode === 'khata') {
           const sm = khatas.find(k => k.id === posSalesmanId);
           if (!sm) {
-            alert('Pehle Salesman select karein ya Khata tab mein jakar Salesman add karein!');
+            showNotify('Pehle Salesman select karein ya Khata tab mein add karein!', 'error');
             return;
           }
 
@@ -319,7 +492,7 @@
             items: [...cart]
           };
 
-          const updatedKhatas = khatas.map(k => k.id === sm.id ? { ...k, transactions: [tx, ...k.transactions] } : k);
+          const updatedKhatas = khatas.map(k => k.id === sm.id ? { ...k, transactions: [tx, ...(k.transactions || [])] } : k);
           setKhatas(updatedKhatas);
 
           const updatedSm = updatedKhatas.find(k => k.id === sm.id);
@@ -340,13 +513,18 @@
           });
 
           setCart([]); setCustomerName(''); setDiscount('');
+          showNotify(`Stock added to ${sm.name}'s Khata!`, 'success');
         }
       };
 
-      // --- KHATA TAB LOGIC ---
+      // Khata Management
       const handleAddSalesman = (e) => {
         e.preventDefault();
-        if (!newSalesman.name.trim()) return alert('Salesman name is required!');
+        if (!isManager) return;
+        if (!newSalesman.name.trim()) {
+          showNotify('Salesman ka naam likhna zaroori hai!', 'error');
+          return;
+        }
         const sm = {
           id: 'sm_' + Date.now(),
           name: newSalesman.name.trim(),
@@ -358,15 +536,20 @@
         setSelectedSalesmanId(sm.id);
         setPosSalesmanId(sm.id);
         setNewSalesman({ name: '', phone: '', route: '' });
+        showNotify(`Salesman "${sm.name}" ka khata ban gaya!`, 'success');
       };
 
       const handleKhataTransaction = (e) => {
         e.preventDefault();
+        if (!isManager) return;
         const sm = khatas.find(k => k.id === (selectedSalesmanId || (khatas[0] && khatas[0].id)));
         if (!sm) return;
 
         const finalAmt = Number(khataEntry.amount);
-        if (!finalAmt || finalAmt <= 0) return alert('Please enter a valid amount!');
+        if (!finalAmt || finalAmt <= 0) {
+          showNotify('Sahi raqam (Amount) darj karein!', 'error');
+          return;
+        }
 
         const nowMs = Date.now();
         const autoNote = khataEntry.note.trim() || (khataEntry.type === 'stock' ? 'Direct Stock Entry' : 'Cash Received');
@@ -381,7 +564,7 @@
           items: []
         };
 
-        const updatedKhatas = khatas.map(k => k.id === sm.id ? { ...k, transactions: [tx, ...k.transactions] } : k);
+        const updatedKhatas = khatas.map(k => k.id === sm.id ? { ...k, transactions: [tx, ...(k.transactions || [])] } : k);
         setKhatas(updatedKhatas);
 
         if (khataEntry.type === 'payment') {
@@ -416,24 +599,30 @@
         });
 
         setKhataEntry({ type: 'payment', amount: '', note: '' });
+        showNotify(tx.type === 'payment' ? 'Vasooli record ho gayi!' : 'Direct maal khata mein darj ho gaya!', 'success');
       };
 
       const deleteKhataTx = (smId, txId) => {
+        if (!isManager) return;
         if (!window.confirm('Delete this Khata entry?')) return;
-        setKhatas(khatas.map(k => k.id === smId ? { ...k, transactions: k.transactions.filter(t => t.id !== txId) } : k));
+        setKhatas(khatas.map(k => k.id === smId ? { ...k, transactions: (k.transactions || []).filter(t => t.id !== txId) } : k));
+        showNotify('Khata entry delete kar di gayi.', 'info');
       };
 
       const deleteSalesman = (smId) => {
+        if (!isManager) return;
         if (!window.confirm('Delete this Salesman and entire Khata history permanently?')) return;
         const remaining = khatas.filter(k => k.id !== smId);
         setKhatas(remaining);
         if (selectedSalesmanId === smId) setSelectedSalesmanId(remaining[0]?.id || null);
         if (posSalesmanId === smId) setPosSalesmanId(remaining[0]?.id || '');
         if (dashSalesmanModalId === smId) setDashSalesmanModalId(null);
+        showNotify('Salesman khata delete kar diya gaya.', 'info');
       };
 
-      // --- PARTIAL RETURN LOGIC ---
+      // Partial Return Modal
       const openReturnModal = (sale) => {
+        if (!isManager) return;
         setReturnModalSale(JSON.parse(JSON.stringify(sale)));
         setCustomRefundAmt('');
       };
@@ -451,35 +640,51 @@
 
       const applyCustomRefund = () => {
         const refVal = Number(customRefundAmt);
-        if (!refVal || refVal <= 0) return alert('Enter valid return amount!');
-        if (refVal > returnModalSale.amount) return alert('Return amount cannot exceed current bill total!');
+        if (!refVal || refVal <= 0) {
+          showNotify('Sahi return amount likhein!', 'error');
+          return;
+        }
+        if (refVal > returnModalSale.amount) {
+          showNotify('Return amount mojooda bill se zyada nahi ho sakti!', 'error');
+          return;
+        }
         const updatedRefunded = (returnModalSale.refundedAmount || 0) + refVal;
         const newTotal = returnModalSale.amount - refVal;
         setReturnModalSale({ ...returnModalSale, refundedAmount: updatedRefunded, amount: newTotal });
         setCustomRefundAmt('');
+        showNotify(`Rs. ${refVal} deduct kar diya gaya.`, 'info');
       };
 
       const saveReturnChanges = () => {
-        if (!returnModalSale) return;
+        if (!returnModalSale || !isManager) return;
         if (returnModalSale.amount === 0 && (!returnModalSale.items || returnModalSale.items.length === 0)) {
           if (window.confirm('Bill total is 0. Remove this transaction completely?')) {
             setSales(sales.filter(s => s.id !== returnModalSale.id));
             setReturnModalSale(null);
+            showNotify('Zero bill record remove kar diya gaya.', 'info');
             return;
           }
         }
         setSales(sales.map(s => s.id === returnModalSale.id ? returnModalSale : s));
         setReturnModalSale(null);
-        alert('Bill updated successfully after return!');
+        showNotify('Return ke baad bill update ho gaya hai!', 'success');
       };
 
       const deleteRecord = (id, listType) => {
-        if(listType === 'sale' && window.confirm('Revert entire sale completely?')) { setSales(sales.filter(s => s.id !== id)); }
-        if(listType === 'expense' && window.confirm('Delete this expense?')) { setExpenses(expenses.filter(e => e.id !== id)); }
+        if (!isManager) return;
+        if(listType === 'sale' && window.confirm('Revert entire sale completely?')) { 
+          setSales(sales.filter(s => s.id !== id)); 
+          showNotify('Sale revert kar di gayi.', 'info');
+        }
+        if(listType === 'expense' && window.confirm('Delete this expense?')) { 
+          setExpenses(expenses.filter(e => e.id !== id)); 
+          showNotify('Expense delete kar diya gaya.', 'info');
+        }
       };
 
-      // --- PRODUCT ADD & DIRECT EDIT ---
+      // Product Management
       const startEditProduct = (prod) => {
+        if (!isManager) return;
         setEditingProdId(prod.id);
         setProdForm({
           name: prod.name, category: prod.category, packingType: prod.packingType,
@@ -496,7 +701,11 @@
 
       const handleSaveProduct = (e) => {
         e.preventDefault();
-        if(!prodForm.name.trim()) return alert('Product name is required!');
+        if (!isManager) return;
+        if(!prodForm.name.trim()) {
+          showNotify('Product ka naam likhna zaroori hai!', 'error');
+          return;
+        }
         const formattedItem = {
           id: editingProdId || 'prod_' + Date.now(),
           name: prodForm.name.trim(),
@@ -509,17 +718,17 @@
         };
         if (editingProdId) {
           setProducts(products.map(p => p.id === editingProdId ? formattedItem : p));
-          alert('Product rates updated!');
+          showNotify(`"${formattedItem.name}" ke rates update ho gaye!`, 'success');
         } else {
           setProducts([...products, formattedItem]);
-          alert('New product added!');
+          showNotify(`"${formattedItem.name}" menu mein shamil ho gaya!`, 'success');
         }
         cancelEditProduct();
       };
 
-      // --- ANALYTICS ---
-      const totalSales = sales.reduce((a, b) => a + b.amount, 0);
-      const totalExp = expenses.reduce((a, b) => a + b.amount, 0);
+      // Analytics
+      const totalSales = sales.reduce((a, b) => a + Number(b.amount || 0), 0);
+      const totalExp = expenses.reduce((a, b) => a + Number(b.amount || 0), 0);
       const netProfit = totalSales - totalExp;
       const totalMarketBakaya = khatas.reduce((acc, sm) => acc + getSalesmanStats(sm).balance, 0);
 
@@ -532,28 +741,219 @@
       const modalOverallStats = getSalesmanStats(modalSalesman);
       const modalPeriodStats = getFilteredKhataStats(modalSalesman, khataPeriod);
 
-      // --- LOGIN SCREEN ---
-      if (!isLoggedIn) {
+      // Modern Floating Toast Component
+      const ToastBanner = () => {
+        if (!toast) return null;
+        const styles = {
+          success: {
+            bg: 'bg-[#0B1120] border-emerald-500/60',
+            badge: 'bg-emerald-500/20 text-emerald-400',
+            icon: '✅',
+            bar: 'bg-emerald-400'
+          },
+          error: {
+            bg: 'bg-[#0B1120] border-rose-500/60',
+            badge: 'bg-rose-500/20 text-rose-400',
+            icon: '⚠️',
+            bar: 'bg-rose-500'
+          },
+          info: {
+            bg: 'bg-[#0B1120] border-amber-500/60',
+            badge: 'bg-amber-500/20 text-amber-400',
+            icon: '✨',
+            bar: 'bg-amber-400'
+          }
+        }[toast.type] || {
+          bg: 'bg-[#0B1120] border-amber-500/60',
+          badge: 'bg-amber-500/20 text-amber-400',
+          icon: '✨',
+          bar: 'bg-amber-400'
+        };
+
         return (
-          <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-tr from-rose-600/20 to-amber-600/20 opacity-50 blur-3xl"></div>
-            <div className="bg-white/10 backdrop-blur-2xl border border-white/20 p-8 rounded-[2rem] shadow-2xl w-full max-w-sm text-center relative z-10">
-              <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-rose-500 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl shadow-rose-500/30 mb-6">🍞</div>
-              <h1 className="text-3xl font-black text-white tracking-widest mb-1">{settings.name}</h1>
-              <p className="text-xs text-amber-300 font-bold mb-8 uppercase tracking-widest">Admin Terminal</p>
-              
+          <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-[100] toast-slide no-print">
+            <div className={`${styles.bg} border backdrop-blur-xl text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3.5 relative overflow-hidden`}>
+              <div className={`w-10 h-10 rounded-xl ${styles.badge} flex items-center justify-center text-lg shrink-0`}>
+                {styles.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{toast.title}</p>
+                <p className="text-xs sm:text-sm font-bold text-white leading-snug mt-0.5 break-words">{toast.message}</p>
+              </div>
+              <button onClick={() => setToast(null)} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-extrabold flex items-center justify-center shrink-0">
+                ✕
+              </button>
+              <div className={`absolute bottom-0 left-0 h-1 w-full ${styles.bar}`}></div>
+            </div>
+          </div>
+        );
+      };
+
+      // --- SIMPLE LOGIN & SECURITY KEY SCREEN ---
+      if (!userRole) {
+        return (
+          <div className="min-h-screen bg-[#0B1120] flex items-center justify-center p-4 relative overflow-hidden">
+            <ToastBanner />
+            <div className="absolute -top-24 -left-24 w-96 h-96 bg-amber-500/20 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl"></div>
+
+            <div className="bg-slate-900/90 backdrop-blur-2xl border border-slate-700/80 p-7 sm:p-9 rounded-[2.25rem] shadow-2xl w-full max-w-md text-center relative z-10">
+              <div className="flex justify-center mb-3">
+                <BrandLogo size="lg" customLogoUrl={settings.logoUrl} />
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-wider mb-1">{settings.name}</h1>
+              <p className="text-[11px] text-amber-400 font-bold mb-6 uppercase tracking-[0.2em]">POS & Khata Management</p>
+
               {!showForgot ? (
-                <form onSubmit={handleLogin} className="space-y-4 fade-in">
-                  <input type="password" placeholder="Enter PIN" value={pinInput} onChange={e => setPinInput(e.target.value)} className="w-full p-4 bg-black/30 border border-slate-600 rounded-2xl text-center text-2xl text-white tracking-[0.5em] focus:outline-none focus:border-amber-400 transition placeholder:text-sm placeholder:tracking-normal" autoFocus />
-                  <button type="submit" className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-white font-black tracking-widest uppercase py-4 rounded-2xl shadow-lg transition">LOGIN</button>
-                  <button type="button" onClick={() => setShowForgot(true)} className="text-xs text-slate-400 hover:text-white mt-4 block w-full">Forgot PIN?</button>
-                </form>
+                <div>
+                  <div className="grid grid-cols-2 gap-2 bg-[#0B1120] p-1.5 rounded-2xl border border-slate-800 mb-6">
+                    <button 
+                      type="button" 
+                      onClick={() => { setLoginRoleSelect('manager'); setLoginIdInput(''); setPinInput(''); setLoginError(''); }} 
+                      className={`py-3 px-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition flex flex-col items-center gap-0.5 ${loginRoleSelect === 'manager' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      <span>👨‍💼 Manager</span>
+                      <span className={`text-[9px] font-bold ${loginRoleSelect === 'manager' ? 'text-slate-900/80' : 'text-slate-500'}`}>Full Control</span>
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { setLoginRoleSelect('owner'); setLoginIdInput(''); setPinInput(''); setLoginError(''); }} 
+                      className={`py-3 px-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition flex flex-col items-center gap-0.5 ${loginRoleSelect === 'owner' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      <span>👑 Owner</span>
+                      <span className={`text-[9px] font-bold ${loginRoleSelect === 'owner' ? 'text-slate-900/80' : 'text-slate-500'}`}>Hisab View Only</span>
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleLogin} className="space-y-4 fade-in text-left">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">
+                        Username ya Mobile Number
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. tony ya 0300-1234567" 
+                        value={loginIdInput} 
+                        onChange={e => setLoginIdInput(e.target.value)} 
+                        className="w-full px-4 py-3.5 bg-[#0B1120] border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none focus:border-amber-400 transition placeholder:text-slate-600" 
+                        autoFocus 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">
+                        Password / PIN
+                      </label>
+                      <div className="relative">
+                        <input 
+                          type={showPin ? "text" : "password"} 
+                          placeholder="••••" 
+                          value={pinInput} 
+                          onChange={e => setPinInput(e.target.value)} 
+                          className="w-full px-4 py-3.5 bg-[#0B1120] border border-slate-700 rounded-2xl text-lg font-extrabold text-white tracking-[0.35em] focus:outline-none focus:border-amber-400 transition placeholder:text-slate-600" 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => setShowPin(!showPin)} 
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-400 hover:text-amber-400"
+                        >
+                          {showPin ? 'HIDE' : 'SHOW'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {loginError && (
+                      <div className="p-3 bg-rose-500/15 border border-rose-500/40 rounded-xl text-xs font-bold text-rose-300 text-center">
+                        ⚠️ {loginError}
+                      </div>
+                    )}
+
+                    <button 
+                      type="submit" 
+                      className={`w-full font-extrabold tracking-widest uppercase py-4 rounded-2xl shadow-lg transition text-slate-950 ${loginRoleSelect === 'manager' ? 'bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400' : 'bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400'}`}
+                    >
+                      Login ({loginRoleSelect === 'manager' ? 'Manager' : 'Owner'})
+                    </button>
+
+                    <button 
+                      type="button" 
+                      onClick={() => { 
+                        setKeyRole(loginRoleSelect); 
+                        setSecurityKeyInput(''); 
+                        setNewPinInput(''); 
+                        setKeyError(''); 
+                        setShowForgot(true); 
+                      }} 
+                      className="text-xs text-slate-400 hover:text-amber-400 mt-2 block w-full text-center font-semibold"
+                    >
+                      🔑 Password bhool gaye? Security Key lagayein
+                    </button>
+                  </form>
+                </div>
               ) : (
-                <form onSubmit={handleRecovery} className="space-y-4 fade-in">
-                  <p className="text-xs text-amber-400 font-bold mb-2 uppercase">Verify Owner Name</p>
-                  <input type="text" placeholder="Enter Owner Name" value={recoveryName} onChange={e => setRecoveryName(e.target.value)} className="w-full p-4 bg-black/30 border border-slate-600 rounded-2xl text-center text-white focus:outline-none focus:border-amber-400 transition" autoFocus />
-                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black tracking-widest uppercase py-4 rounded-2xl shadow-lg transition">Recover PIN</button>
-                  <button type="button" onClick={() => setShowForgot(false)} className="text-xs text-slate-400 hover:text-white mt-4 block w-full">Back to Login</button>
+                <form onSubmit={handleSecurityKeyUnlock} className="space-y-4 fade-in text-left">
+                  <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl text-center">
+                    <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider block">🔑 Master Security Key Unlock</span>
+                    <span className="text-[10px] text-slate-300 block mt-0.5">Security Key lagayein aur foran andar jakar hisab dekhein</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-[#0B1120] p-1.5 rounded-xl border border-slate-800">
+                    <button 
+                      type="button" 
+                      onClick={() => { setKeyRole('manager'); setKeyError(''); }} 
+                      className={`py-2.5 rounded-lg text-xs font-extrabold transition ${keyRole === 'manager' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      👨‍💼 Manager
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { setKeyRole('owner'); setKeyError(''); }} 
+                      className={`py-2.5 rounded-lg text-xs font-extrabold transition ${keyRole === 'owner' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      👑 Owner
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest block mb-1.5">
+                      Enter {keyRole === 'manager' ? 'Manager' : 'Owner'} Security Key
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. KEY-12345" 
+                      value={securityKeyInput} 
+                      onChange={e => setSecurityKeyInput(e.target.value)} 
+                      className="w-full p-3.5 bg-[#0B1120] border border-slate-700 rounded-2xl text-sm font-extrabold text-white text-center tracking-widest focus:outline-none focus:border-amber-400" 
+                      autoFocus 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">
+                      New Password Set Karein (Optional)
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="Khali chhor dein agar purana rakhna ho" 
+                      value={newPinInput} 
+                      onChange={e => setNewPinInput(e.target.value)} 
+                      className="w-full p-3 bg-[#0B1120] border border-slate-700 rounded-xl text-xs font-bold text-white text-center focus:outline-none focus:border-emerald-400" 
+                    />
+                  </div>
+
+                  {keyError && (
+                    <div className="p-2.5 bg-rose-500/15 border border-rose-500/40 rounded-xl text-xs font-bold text-rose-300 text-center">
+                      ⚠️ {keyError}
+                    </div>
+                  )}
+
+                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold tracking-widest uppercase py-3.5 rounded-2xl shadow-lg transition text-xs">
+                    🔓 Unlock & Open System
+                  </button>
+
+                  <button type="button" onClick={() => setShowForgot(false)} className="text-xs text-slate-400 hover:text-white block w-full text-center pt-1">
+                    ← Back to Login
+                  </button>
                 </form>
               )}
             </div>
@@ -562,52 +962,80 @@
       }
 
       const NavItem = ({ id, icon, label }) => (
-        <button onClick={() => setActiveTab(id)} className={`flex flex-col md:flex-row items-center gap-1 md:gap-3 p-2 md:px-4 md:py-3.5 w-full rounded-2xl transition-all ${activeTab === id ? 'bg-amber-500 text-slate-900 shadow-lg font-black' : 'text-slate-400 hover:bg-slate-800 hover:text-white font-bold'}`}>
-          <span className="text-xl md:text-xl">{icon}</span><span className="text-[10px] md:text-sm tracking-wide">{label}</span>
+        <button onClick={() => setActiveTab(id)} className={`flex flex-col md:flex-row items-center gap-1 md:gap-3 p-2 md:px-4 md:py-3.5 w-full rounded-2xl transition-all ${activeTab === id ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 font-extrabold' : 'text-slate-400 hover:bg-slate-800/80 hover:text-white font-bold'}`}>
+          <span className="text-xl">{icon}</span><span className="text-[10px] md:text-sm tracking-wide">{label}</span>
         </button>
       );
 
       return (
-        <div className="min-h-screen flex flex-col md:flex-row bg-slate-100">
+        <div className="min-h-screen flex flex-col md:flex-row bg-[#f3f6fa]">
+          <ToastBanner />
           
           {/* Desktop Sidebar */}
-          <aside className="hidden md:flex flex-col w-64 bg-slate-900 h-screen sticky top-0 border-r border-slate-800 p-5 shrink-0 z-40">
-            <div className="mb-10 px-1 border-b border-slate-800 pb-5">
-              <h1 className="text-2xl font-black text-white tracking-widest leading-tight">{settings.name}</h1>
-              <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
+          <aside className="hidden md:flex flex-col w-68 bg-[#0B1120] h-screen sticky top-0 border-r border-slate-800 p-5 shrink-0 z-40">
+            <div className="mb-8 px-1 border-b border-slate-800/80 pb-5 flex items-center gap-3.5">
+              <BrandLogo size="md" customLogoUrl={settings.logoUrl} />
+              <div className="min-w-0">
+                <h1 className="text-lg font-extrabold text-white tracking-wider leading-tight truncate">{settings.name}</h1>
+                <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-widest ${isManager ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>
+                  {isManager ? `👨‍💼 ${settings.managerUsername || 'tony'}` : `👑 ${settings.ownerUsername || 'admin'} (View)`}
+                </span>
+              </div>
             </div>
+
             <nav className="flex-1 space-y-2">
-              <NavItem id="pos" icon="🛒" label="POS & Stock Issue" />
-              <NavItem id="khata" icon="📒" label="Salesman Khata" />
-              <NavItem id="dashboard" icon="📈" label="Dashboard" />
-              <NavItem id="expenses" icon="💵" label="Expenses" />
-              <NavItem id="settings" icon="⚙️" label="Settings" />
+              {isManager && <NavItem id="pos" icon="🛒" label="POS & Stock Issue" />}
+              {isManager && <NavItem id="khata" icon="📒" label="Salesman Khata" />}
+              <NavItem id="dashboard" icon="📈" label="Dashboard & Hisab" />
+              <NavItem id="expenses" icon="💵" label={isManager ? "Expenses" : "Expenses View"} />
+              {isManager && <NavItem id="settings" icon="⚙️" label="Settings & Security" />}
             </nav>
-            <button onClick={() => setIsLoggedIn(false)} className="mt-auto bg-slate-800 text-slate-300 hover:bg-red-500 hover:text-white py-4 rounded-2xl font-black tracking-widest transition shadow-lg text-sm">🔒 LOCK SYSTEM</button>
+
+            <button onClick={() => setUserRole(null)} className="mt-auto bg-slate-800/90 text-slate-300 hover:bg-rose-600 hover:text-white py-4 rounded-2xl font-extrabold tracking-widest transition shadow-lg text-xs">
+              🔒 LOCK / LOGOUT
+            </button>
           </aside>
 
           {/* Main Area */}
           <main className="flex-1 w-full p-3 md:p-6 pb-28 md:pb-6 overflow-y-auto">
             
             {/* Mobile Header */}
-            <div className="md:hidden flex justify-between items-center bg-slate-900 p-4 rounded-3xl mb-4 shadow-lg text-white">
-              <div>
-                <h1 className="text-base font-black truncate">{settings.name}</h1>
-                <p className="text-[10px] text-amber-500 tracking-widest">Admin Access</p>
+            <div className="md:hidden flex justify-between items-center bg-[#0B1120] p-3.5 rounded-3xl mb-4 shadow-lg text-white border border-slate-800">
+              <div className="flex items-center gap-3 min-w-0">
+                <BrandLogo size="sm" customLogoUrl={settings.logoUrl} />
+                <div className="min-w-0">
+                  <h1 className="text-sm font-extrabold truncate tracking-wide">{settings.name}</h1>
+                  <span className={`text-[9px] font-extrabold uppercase tracking-widest ${isManager ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {isManager ? `Manager: ${settings.managerUsername || 'tony'}` : `Owner: ${settings.ownerUsername || 'admin'} (View)`}
+                  </span>
+                </div>
               </div>
-              <button onClick={() => setIsLoggedIn(false)} className="bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-500 transition">Lock</button>
+              <button onClick={() => setUserRole(null)} className="bg-slate-800 border border-slate-700 px-3.5 py-2 rounded-xl text-[11px] font-extrabold hover:bg-rose-600 transition shrink-0">
+                Lock
+              </button>
             </div>
 
-            {/* TAB 1: UNIFIED POS */}
-            {activeTab === 'pos' && (
+            {isOwner && (
+              <div className="mb-5 bg-gradient-to-r from-emerald-900 to-teal-900 text-white p-4 rounded-2xl shadow-md flex flex-wrap justify-between items-center gap-2 border border-emerald-700/50">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">👑</span>
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-300">Owner View Mode ({settings.ownerUsername})</p>
+                    <p className="text-[11px] text-emerald-100/90">Aap tamam Sales, Salesman Khata (Weekly/Monthly/Yearly) aur Expenses ka hisab dekh sakte hain.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 1: POS */}
+            {activeTab === 'pos' && isManager && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start fade-in">
                 
-                {/* Left: Product Selection Grid */}
                 <div className="lg:col-span-7 xl:col-span-8 space-y-4">
                   <div className="bg-white p-2.5 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
                     <div className="flex overflow-x-auto hide-scroll w-full gap-2 p-1">
                       {categories.map(c => (
-                        <button key={c} onClick={() => setSelectedCat(c)} className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition ${selectedCat===c ? (posMode==='khata'?'bg-rose-600 text-white':'bg-amber-500 text-slate-900') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{c}</button>
+                        <button key={c} onClick={() => setSelectedCat(c)} className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold uppercase tracking-wider whitespace-nowrap transition ${selectedCat===c ? (posMode==='khata'?'bg-rose-600 text-white shadow':'bg-[#0B1120] text-amber-400 shadow') : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{c}</button>
                       ))}
                     </div>
                     <input type="text" placeholder="🔍 Search item..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-56 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-amber-400 shrink-0" />
@@ -621,29 +1049,29 @@
                       const reg2Rate = posMode === 'khata' ? (p.wsReg2 || p.reg2) : p.reg2;
 
                       return (
-                        <div key={p.id} className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition">
+                        <div key={p.id} className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200/80 flex flex-col justify-between hover:shadow-md transition">
                           <div className="mb-3 flex justify-between items-start gap-2">
                             <div className="min-w-0">
-                              <h3 className="font-black text-slate-800 text-base leading-snug break-words mb-1">{p.name}</h3>
-                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg inline-block ${posMode==='khata'?'bg-rose-100 text-rose-700':'bg-amber-100 text-amber-800'}`}>{p.category}</span>
+                              <h3 className="font-extrabold text-slate-900 text-base leading-snug break-words mb-1">{p.name}</h3>
+                              <span className={`text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-lg inline-block ${posMode==='khata'?'bg-rose-100 text-rose-700':'bg-amber-100 text-amber-800'}`}>{p.category}</span>
                             </div>
-                            {posMode === 'khata' && <span className="text-[9px] font-black bg-slate-900 text-amber-400 px-2 py-0.5 rounded uppercase shrink-0">Khata Rate</span>}
+                            {posMode === 'khata' && <span className="text-[9px] font-extrabold bg-[#0B1120] text-amber-400 px-2 py-0.5 rounded uppercase shrink-0">Khata Rate</span>}
                           </div>
                           
                           <div className="space-y-2.5 mt-auto">
-                            <div className={`p-2.5 rounded-2xl border ${posMode==='khata'?'bg-rose-50/70 border-rose-100':'bg-amber-50 border-amber-100'}`}>
-                              <span className="text-[10px] font-black text-slate-500 block mb-1.5 tracking-widest">🌟 SPECIAL</span>
+                            <div className={`p-2.5 rounded-2xl border ${posMode==='khata'?'bg-rose-50/70 border-rose-100':'bg-amber-50/80 border-amber-200/70'}`}>
+                              <span className="text-[10px] font-extrabold text-slate-600 block mb-1.5 tracking-widest">🌟 SPECIAL</span>
                               <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => addToCart(p, 'special', '1')} className={`py-2 px-1 rounded-xl text-xs font-bold shadow-sm transition ${posMode==='khata'?'bg-rose-600 text-white hover:bg-rose-700':'bg-white border border-amber-200 text-amber-900 hover:bg-amber-100'}`}>
+                                <button onClick={() => addToCart(p, 'special', '1')} className={`py-2 px-1 rounded-xl text-xs font-extrabold shadow-sm transition ${posMode==='khata'?'bg-rose-600 text-white hover:bg-rose-700':'bg-white border border-amber-300 text-slate-900 hover:bg-amber-400'}`}>
                                   {p.packingType==='weight'?'1kg':'1 Pk'}<br/><span className="text-[10px] opacity-90">Rs.{sp1Rate}</span>
                                 </button>
-                                <button onClick={() => addToCart(p, 'special', '2')} className={`py-2 px-1 rounded-xl text-xs font-bold shadow-sm transition ${posMode==='khata'?'bg-rose-600 text-white hover:bg-rose-700':'bg-white border border-amber-200 text-amber-900 hover:bg-amber-100'}`}>
+                                <button onClick={() => addToCart(p, 'special', '2')} className={`py-2 px-1 rounded-xl text-xs font-extrabold shadow-sm transition ${posMode==='khata'?'bg-rose-600 text-white hover:bg-rose-700':'bg-white border border-amber-300 text-slate-900 hover:bg-amber-400'}`}>
                                   {p.packingType==='weight'?'2kg':'5 Pk'}<br/><span className="text-[10px] opacity-90">Rs.{sp2Rate}</span>
                                 </button>
                               </div>
                             </div>
-                            <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
-                              <span className="text-[10px] font-black text-slate-400 block mb-1.5 tracking-widest">⭐ REGULAR</span>
+                            <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                              <span className="text-[10px] font-extrabold text-slate-400 block mb-1.5 tracking-widest">⭐ REGULAR</span>
                               <div className="grid grid-cols-2 gap-2">
                                 <button onClick={() => addToCart(p, 'regular', '1')} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 py-2 px-1 rounded-xl text-xs font-bold shadow-sm">
                                   {p.packingType==='weight'?'1kg':'1 Pk'}<br/><span className="text-[10px] text-slate-500">Rs.{reg1Rate}</span>
@@ -660,16 +1088,16 @@
                   </div>
                 </div>
 
-                {/* Right: Live Cart & Mode Switcher */}
+                {/* Live Cart */}
                 <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-4">
-                  <div className={`bg-white p-4 sm:p-5 rounded-[2rem] shadow-xl border-2 flex flex-col justify-between lg:max-h-[calc(100vh-2rem)] transition-colors ${posMode==='khata'?'border-rose-300':'border-amber-200'}`}>
+                  <div className={`bg-white p-4 sm:p-5 rounded-[2rem] shadow-xl border-2 flex flex-col justify-between lg:max-h-[calc(100vh-2rem)] transition-colors ${posMode==='khata'?'border-rose-300':'border-amber-300'}`}>
                     
                     <div className="space-y-3 shrink-0">
                       <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
-                        <button type="button" onClick={() => switchPosMode('retail')} className={`py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition ${posMode==='retail'?'bg-amber-500 text-slate-900 shadow':'text-slate-500 hover:text-slate-800'}`}>
+                        <button type="button" onClick={() => switchPosMode('retail')} className={`py-2.5 px-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition ${posMode==='retail'?'bg-[#0B1120] text-amber-400 shadow':'text-slate-500 hover:text-slate-800'}`}>
                           🛒 Retail Cash
                         </button>
-                        <button type="button" onClick={() => switchPosMode('khata')} className={`py-2.5 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition ${posMode==='khata'?'bg-rose-600 text-white shadow':'text-slate-500 hover:text-slate-800'}`}>
+                        <button type="button" onClick={() => switchPosMode('khata')} className={`py-2.5 px-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition ${posMode==='khata'?'bg-rose-600 text-white shadow':'text-slate-500 hover:text-slate-800'}`}>
                           📒 Salesman Khata
                         </button>
                       </div>
@@ -679,15 +1107,15 @@
                       ) : (
                         <div className="space-y-2 bg-rose-50 p-3 rounded-2xl border border-rose-200">
                           <div className="flex justify-between items-center gap-2">
-                            <label className="text-[10px] font-black text-rose-700 uppercase tracking-wider">Select Salesman</label>
-                            <button type="button" onClick={() => setActiveTab('khata')} className="text-[10px] font-black text-indigo-600 underline shrink-0">+ New Salesman</button>
+                            <label className="text-[10px] font-extrabold text-rose-700 uppercase tracking-wider">Select Salesman</label>
+                            <button type="button" onClick={() => setActiveTab('khata')} className="text-[10px] font-extrabold text-indigo-600 underline shrink-0">+ New Salesman</button>
                           </div>
                           {khatas.length === 0 ? (
-                            <button type="button" onClick={() => setActiveTab('khata')} className="w-full py-2.5 bg-white border border-rose-300 text-rose-700 rounded-xl text-xs font-black">
+                            <button type="button" onClick={() => setActiveTab('khata')} className="w-full py-2.5 bg-white border border-rose-300 text-rose-700 rounded-xl text-xs font-extrabold">
                               No Salesman — Click to Add
                             </button>
                           ) : (
-                            <select value={posSalesmanId} onChange={e => setPosSalesmanId(e.target.value)} className="w-full p-2.5 bg-white border border-rose-200 rounded-xl text-xs sm:text-sm font-black text-slate-800 focus:outline-none">
+                            <select value={posSalesmanId} onChange={e => setPosSalesmanId(e.target.value)} className="w-full p-2.5 bg-white border border-rose-200 rounded-xl text-xs sm:text-sm font-extrabold text-slate-800 focus:outline-none">
                               {khatas.map(sm => {
                                 const st = getSalesmanStats(sm);
                                 return (
@@ -712,14 +1140,14 @@
                       ) : cart.map(i => (
                         <div key={i.cartId} className="py-2.5 flex justify-between items-center gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="font-black text-slate-800 text-xs truncate">{i.name}</p>
+                            <p className="font-extrabold text-slate-800 text-xs truncate">{i.name}</p>
                             <p className="text-[10px] text-slate-400 font-bold mt-0.5">Rs.{i.price} each</p>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => updateQty(i.cartId, -1)} className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-black hover:bg-slate-200">-</button>
-                            <span className="text-xs font-black w-5 text-center">{i.qty}</span>
-                            <button onClick={() => updateQty(i.cartId, 1)} className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-black hover:bg-slate-200">+</button>
-                            <span className="font-black text-slate-700 text-xs w-14 text-right">Rs.{i.price * i.qty}</span>
+                            <button onClick={() => updateQty(i.cartId, -1)} className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-extrabold hover:bg-slate-200">-</button>
+                            <span className="text-xs font-extrabold w-5 text-center">{i.qty}</span>
+                            <button onClick={() => updateQty(i.cartId, 1)} className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-extrabold hover:bg-slate-200">+</button>
+                            <span className="font-extrabold text-slate-700 text-xs w-14 text-right">Rs.{i.price * i.qty}</span>
                             <button onClick={() => removeFromCart(i.cartId)} className="w-6 h-6 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition text-xs font-bold ml-0.5">✕</button>
                           </div>
                         </div>
@@ -728,16 +1156,16 @@
                     
                     <div className="pt-3 border-t border-slate-200 shrink-0 space-y-3 bg-white">
                       <div className="flex justify-between items-center bg-slate-50 p-2 rounded-2xl border border-slate-100">
-                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider px-2">Discount</span>
-                        <input type="number" placeholder="0" value={discount} onChange={e=>setDiscount(e.target.value)} className="w-24 p-1.5 text-right bg-white border border-slate-200 rounded-xl text-sm font-black focus:outline-none"/>
+                        <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-2">Discount</span>
+                        <input type="number" placeholder="0" value={discount} onChange={e=>setDiscount(e.target.value)} className="w-24 p-1.5 text-right bg-white border border-slate-200 rounded-xl text-sm font-extrabold focus:outline-none"/>
                       </div>
                       <div className="flex justify-between items-center px-1">
-                        <span className="font-black text-slate-500 uppercase tracking-wider text-xs">
+                        <span className="font-extrabold text-slate-500 uppercase tracking-wider text-xs">
                           {posMode==='khata' ? 'Stock Value' : 'Grand Total'}
                         </span>
-                        <span className={`text-2xl sm:text-3xl font-black tracking-tight ${posMode==='khata'?'text-rose-600':'text-amber-500'}`}>Rs. {grandTotal.toLocaleString()}</span>
+                        <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${posMode==='khata'?'text-rose-600':'text-amber-600'}`}>Rs. {grandTotal.toLocaleString()}</span>
                       </div>
-                      <button onClick={checkout} disabled={cart.length===0} className={`w-full text-white font-black py-3.5 sm:py-4 rounded-2xl uppercase tracking-wider text-xs transition shadow-lg disabled:opacity-50 ${posMode==='khata'?'bg-rose-600 hover:bg-rose-700 shadow-rose-500/30':'bg-slate-900 hover:bg-slate-800 shadow-slate-900/30'}`}>
+                      <button onClick={checkout} disabled={cart.length===0} className={`w-full font-extrabold py-3.5 sm:py-4 rounded-2xl uppercase tracking-wider text-xs transition shadow-lg disabled:opacity-50 ${posMode==='khata'?'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/30':'bg-[#0B1120] hover:bg-slate-800 text-amber-400 shadow-slate-900/30'}`}>
                         {posMode==='khata' ? '📒 Add To Khata & Print Slip' : '🖨️ Print Retail Invoice'}
                       </button>
                     </div>
@@ -748,35 +1176,35 @@
             )}
 
             {/* TAB 2: SALESMAN KHATA */}
-            {activeTab === 'khata' && (
+            {activeTab === 'khata' && isManager && (
               <div className="space-y-6 fade-in">
-                <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="bg-[#0B1120] text-white p-6 rounded-[2rem] shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-800">
                   <div>
-                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Salesman Ledger & Recovery</p>
-                    <h2 className="text-2xl font-black mt-0.5">📒 Salesman Khata & Bakaya</h2>
+                    <p className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest">Salesman Ledger & Recovery</p>
+                    <h2 className="text-2xl font-extrabold mt-0.5">📒 Salesman Khata & Bakaya</h2>
                   </div>
                   <div className="bg-white/10 px-5 py-3 rounded-2xl border border-white/10">
                     <span className="text-[10px] text-slate-300 font-bold uppercase block">Total Market Bakaya</span>
-                    <span className="text-2xl font-black text-rose-400">Rs. {totalMarketBakaya.toLocaleString()}</span>
+                    <span className="text-2xl font-extrabold text-rose-400">Rs. {totalMarketBakaya.toLocaleString()}</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="space-y-6">
                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                      <h3 className="font-black text-base mb-4">➕ Add New Salesman</h3>
+                      <h3 className="font-extrabold text-base mb-4">➕ Add New Salesman</h3>
                       <form onSubmit={handleAddSalesman} className="space-y-3">
-                        <input type="text" placeholder="Salesman Name (e.g. Ali)" value={newSalesman.name} onChange={e=>setNewSalesman({...newSalesman, name: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none" />
+                        <input type="text" placeholder="Salesman Name (e.g. Tony)" value={newSalesman.name} onChange={e=>setNewSalesman({...newSalesman, name: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none" />
                         <div className="grid grid-cols-2 gap-2">
                           <input type="text" placeholder="Phone Number" value={newSalesman.phone} onChange={e=>setNewSalesman({...newSalesman, phone: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none" />
                           <input type="text" placeholder="Area / Route" value={newSalesman.route} onChange={e=>setNewSalesman({...newSalesman, route: e.target.value})} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none" />
                         </div>
-                        <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-2xl text-xs uppercase tracking-widest transition">Create Khata</button>
+                        <button type="submit" className="w-full bg-[#0B1120] hover:bg-slate-800 text-amber-400 font-extrabold py-3.5 rounded-2xl text-xs uppercase tracking-widest transition">Create Khata</button>
                       </form>
                     </div>
 
                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                      <h3 className="font-black text-base mb-4">Active Salesmen ({khatas.length})</h3>
+                      <h3 className="font-extrabold text-base mb-4">Active Salesmen ({khatas.length})</h3>
                       {khatas.length === 0 ? (
                         <p className="text-xs text-slate-400 font-bold text-center py-6">No salesman added yet.</p>
                       ) : (
@@ -787,12 +1215,12 @@
                             return (
                               <div key={sm.id} onClick={() => setSelectedSalesmanId(sm.id)} className={`p-4 rounded-2xl border cursor-pointer transition flex justify-between items-center ${isSelected ? 'bg-amber-50 border-amber-400 shadow-sm' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
                                 <div>
-                                  <p className="font-black text-slate-800 text-sm">{sm.name}</p>
+                                  <p className="font-extrabold text-slate-800 text-sm">{sm.name}</p>
                                   <p className="text-[10px] text-slate-500 font-bold">{sm.phone || 'No phone'} {sm.route ? `• ${sm.route}` : ''}</p>
                                 </div>
                                 <div className="text-right">
-                                  <span className="text-[9px] font-black uppercase text-slate-400 block">Bakaya</span>
-                                  <span className={`font-black text-sm ${st.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>Rs. {st.balance.toLocaleString()}</span>
+                                  <span className="text-[9px] font-extrabold uppercase text-slate-400 block">Bakaya</span>
+                                  <span className={`font-extrabold text-sm ${st.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>Rs. {st.balance.toLocaleString()}</span>
                                 </div>
                               </div>
                             );
@@ -806,7 +1234,7 @@
                     {!activeSalesman ? (
                       <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3">
                         <span className="text-5xl block">📒</span>
-                        <h3 className="font-black text-xl text-slate-700">Select or Add a Salesman</h3>
+                        <h3 className="font-extrabold text-xl text-slate-700">Select or Add a Salesman</h3>
                         <p className="text-xs text-slate-400 font-medium max-w-md mx-auto">Subha ka saman POS screen se Salesman Khata mode mein add karein, aur sham ki cash vasooli (partial ya full) yahan record karein.</p>
                       </div>
                     ) : (
@@ -814,14 +1242,14 @@
                         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                           <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-4 mb-5">
                             <div>
-                              <h3 className="font-black text-2xl text-slate-900">{activeSalesman.name}</h3>
+                              <h3 className="font-extrabold text-2xl text-slate-900">{activeSalesman.name}</h3>
                               <p className="text-xs font-bold text-slate-400">{activeSalesman.phone} {activeSalesman.route && `| Route: ${activeSalesman.route}`}</p>
                             </div>
-                            <div className="flex gap-2">
-                              <button onClick={() => { setDashSalesmanModalId(activeSalesman.id); setKhataPeriod('weekly'); }} className="text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl hover:bg-indigo-600 hover:text-white transition">
+                            <div className="flex flex-wrap gap-2">
+                              <button onClick={() => { setDashSalesmanModalId(activeSalesman.id); setKhataPeriod('weekly'); }} className="text-[10px] font-extrabold uppercase tracking-widest bg-indigo-50 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl hover:bg-indigo-600 hover:text-white transition">
                                 📊 Weekly / Monthly Report
                               </button>
-                              <button onClick={() => { setPosSalesmanId(activeSalesman.id); switchPosMode('khata'); setActiveTab('pos'); }} className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-slate-900 px-3.5 py-2 rounded-xl hover:bg-amber-400 transition">
+                              <button onClick={() => { setPosSalesmanId(activeSalesman.id); switchPosMode('khata'); setActiveTab('pos'); }} className="text-[10px] font-extrabold uppercase tracking-widest bg-amber-400 text-slate-950 px-3.5 py-2 rounded-xl hover:bg-amber-300 transition">
                                 + Issue Stock
                               </button>
                               <button onClick={() => deleteSalesman(activeSalesman.id)} className="text-[10px] font-bold uppercase tracking-widest bg-red-50 text-red-500 px-3 py-2 rounded-xl hover:bg-red-500 hover:text-white transition">Delete</button>
@@ -830,26 +1258,26 @@
 
                           <div className="grid grid-cols-3 gap-3 sm:gap-4">
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase block">Total Maal Liya</span>
-                              <span className="text-base sm:text-xl font-black text-slate-800 mt-1 block">Rs. {activeSmStats.totalStock.toLocaleString()}</span>
+                              <span className="text-[9px] sm:text-[10px] font-extrabold text-slate-400 uppercase block">Total Maal Liya</span>
+                              <span className="text-base sm:text-xl font-extrabold text-slate-800 mt-1 block">Rs. {activeSmStats.totalStock.toLocaleString()}</span>
                             </div>
                             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                              <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 uppercase block">Total Vasool (Paid)</span>
-                              <span className="text-base sm:text-xl font-black text-emerald-700 mt-1 block">Rs. {activeSmStats.totalPaid.toLocaleString()}</span>
+                              <span className="text-[9px] sm:text-[10px] font-extrabold text-emerald-600 uppercase block">Total Vasool (Paid)</span>
+                              <span className="text-base sm:text-xl font-extrabold text-emerald-700 mt-1 block">Rs. {activeSmStats.totalPaid.toLocaleString()}</span>
                             </div>
-                            <div className={`p-4 rounded-2xl border ${activeSmStats.balance > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-900 text-white border-slate-800'}`}>
-                              <span className={`text-[9px] sm:text-[10px] font-black uppercase block ${activeSmStats.balance > 0 ? 'text-rose-600' : 'text-amber-400'}`}>Bakaya (Remaining)</span>
-                              <span className={`text-base sm:text-xl font-black mt-1 block ${activeSmStats.balance > 0 ? 'text-rose-600' : 'text-white'}`}>Rs. {activeSmStats.balance.toLocaleString()}</span>
+                            <div className={`p-4 rounded-2xl border ${activeSmStats.balance > 0 ? 'bg-rose-50 border-rose-200' : 'bg-[#0B1120] text-white border-slate-800'}`}>
+                              <span className={`text-[9px] sm:text-[10px] font-extrabold uppercase block ${activeSmStats.balance > 0 ? 'text-rose-600' : 'text-amber-400'}`}>Bakaya (Remaining)</span>
+                              <span className={`text-base sm:text-xl font-extrabold mt-1 block ${activeSmStats.balance > 0 ? 'text-rose-600' : 'text-white'}`}>Rs. {activeSmStats.balance.toLocaleString()}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                           <div className="flex gap-2 mb-5">
-                            <button type="button" onClick={() => setKhataEntry({...khataEntry, type: 'payment'})} className={`flex-1 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition ${khataEntry.type === 'payment' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-slate-100 text-slate-500'}`}>
+                            <button type="button" onClick={() => setKhataEntry({...khataEntry, type: 'payment'})} className={`flex-1 py-3.5 rounded-2xl font-extrabold text-xs uppercase tracking-wider transition ${khataEntry.type === 'payment' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-slate-100 text-slate-500'}`}>
                               💵 Sham Payment Vasool (Credit)
                             </button>
-                            <button type="button" onClick={() => setKhataEntry({...khataEntry, type: 'stock'})} className={`flex-1 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition ${khataEntry.type === 'stock' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-slate-100 text-slate-500'}`}>
+                            <button type="button" onClick={() => setKhataEntry({...khataEntry, type: 'stock'})} className={`flex-1 py-3.5 rounded-2xl font-extrabold text-xs uppercase tracking-wider transition ${khataEntry.type === 'stock' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-slate-100 text-slate-500'}`}>
                               📦 Direct Amount Maal (Debit)
                             </button>
                           </div>
@@ -857,39 +1285,39 @@
                           <form onSubmit={handleKhataTransaction} className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">
                                   {khataEntry.type === 'payment' ? 'Vasool Shuda Cash (Partial / Full Rs)' : 'Maal Ki Qeemat (Rs)'}
                                 </label>
-                                <input type="number" placeholder="e.g. 5000" value={khataEntry.amount} onChange={e=>setKhataEntry({...khataEntry, amount: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-base font-black focus:outline-none" />
+                                <input type="number" placeholder="e.g. 5000" value={khataEntry.amount} onChange={e=>setKhataEntry({...khataEntry, amount: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-base font-extrabold focus:outline-none" />
                               </div>
                               <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Detail / Note (Optional)</label>
-                                <input type="text" placeholder={khataEntry.type === 'payment' ? 'e.g. Evening cash return, remaining tomorrow' : 'e.g. Direct stock amount'} value={khataEntry.note} onChange={e=>setKhataEntry({...khataEntry, note: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none" />
+                                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1.5">Detail / Note (Optional)</label>
+                                <input type="text" placeholder={khataEntry.type === 'payment' ? 'e.g. Evening cash return' : 'e.g. Direct stock amount'} value={khataEntry.note} onChange={e=>setKhataEntry({...khataEntry, note: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none" />
                               </div>
                             </div>
 
                             {khataEntry.type === 'payment' && activeSmStats.balance > 0 && (
                               <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => setKhataEntry({...khataEntry, amount: activeSmStats.balance})} className="text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                                <button type="button" onClick={() => setKhataEntry({...khataEntry, amount: activeSmStats.balance})} className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl">
                                   Full Clear (Rs. {activeSmStats.balance})
                                 </button>
-                                <button type="button" onClick={() => setKhataEntry({...khataEntry, amount: Math.round(activeSmStats.balance / 2)})} className="text-[10px] font-black bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl">
+                                <button type="button" onClick={() => setKhataEntry({...khataEntry, amount: Math.round(activeSmStats.balance / 2)})} className="text-[10px] font-extrabold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl">
                                   Half Pay (Rs. {Math.round(activeSmStats.balance / 2)})
                                 </button>
                               </div>
                             )}
 
-                            <button type="submit" className={`w-full text-white font-black py-4 rounded-2xl uppercase tracking-widest text-xs transition shadow-lg ${khataEntry.type === 'payment' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
+                            <button type="submit" className={`w-full text-white font-extrabold py-4 rounded-2xl uppercase tracking-widest text-xs transition shadow-lg ${khataEntry.type === 'payment' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}>
                               {khataEntry.type === 'payment' ? 'Receive Payment & Print Slip' : 'Add Direct Amount & Print Slip'}
                             </button>
                           </form>
                         </div>
 
                         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                          <h4 className="font-black text-base mb-4">Khata History ({activeSalesman.name})</h4>
+                          <h4 className="font-extrabold text-base mb-4">Khata History ({activeSalesman.name})</h4>
                           <div className="overflow-x-auto hide-scroll">
                             <table className="w-full text-left text-xs whitespace-nowrap min-w-[550px]">
-                              <thead className="text-[10px] font-black uppercase text-slate-400 border-b">
+                              <thead className="text-[10px] font-extrabold uppercase text-slate-400 border-b">
                                 <tr>
                                   <th className="pb-3 px-2">Date / Time</th>
                                   <th className="pb-3 px-2">Type</th>
@@ -899,20 +1327,20 @@
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {activeSalesman.transactions.map(tx => (
+                                {(activeSalesman.transactions || []).map(tx => (
                                   <tr key={tx.id} className="hover:bg-slate-50">
                                     <td className="py-3.5 px-2 text-slate-400 font-bold">{tx.date}</td>
                                     <td className="py-3.5 px-2">
-                                      <span className={`px-2.5 py-1 rounded-lg font-black uppercase text-[9px] ${tx.type === 'stock' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                      <span className={`px-2.5 py-1 rounded-lg font-extrabold uppercase text-[9px] ${tx.type === 'stock' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                         {tx.type === 'stock' ? 'Maal Diya' : 'Cash Vasool'}
                                       </span>
                                     </td>
                                     <td className="py-3.5 px-2 font-bold text-slate-700 max-w-[240px] truncate" title={tx.note}>{tx.note}</td>
-                                    <td className={`py-3.5 px-2 text-right font-black text-sm ${tx.type === 'stock' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                      {tx.type === 'stock' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
+                                    <td className={`py-3.5 px-2 text-right font-extrabold text-sm ${tx.type === 'stock' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                      {tx.type === 'stock' ? '+' : '-'} Rs. {Number(tx.amount || 0).toLocaleString()}
                                     </td>
                                     <td className="py-3.5 px-2 text-right">
-                                      <button onClick={() => deleteKhataTx(activeSalesman.id, tx.id)} className="text-red-400 hover:text-red-600 font-black px-2">✕</button>
+                                      <button onClick={() => deleteKhataTx(activeSalesman.id, tx.id)} className="text-red-400 hover:text-red-600 font-extrabold px-2">✕</button>
                                     </td>
                                   </tr>
                                 ))}
@@ -928,53 +1356,56 @@
               </div>
             )}
 
-            {/* TAB 3: DASHBOARD (WITH SALESMAN KHATA LIST + WEEKLY/MONTHLY/YEARLY REPORT) */}
+            {/* TAB 3: DASHBOARD */}
             {activeTab === 'dashboard' && (
               <div className="space-y-6 fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                  <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
                     <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-3">💰</div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Cash Sales</p>
-                    <h3 className="text-3xl font-black text-slate-800 mt-1">Rs. {totalSales.toLocaleString()}</h3>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total Cash Sales</p>
+                    <h3 className="text-3xl font-extrabold text-slate-900 mt-1">Rs. {totalSales.toLocaleString()}</h3>
                   </div>
-                  <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
                     <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl mb-3">📒</div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Salesman Bakaya</p>
-                    <h3 className="text-3xl font-black text-amber-600 mt-1">Rs. {totalMarketBakaya.toLocaleString()}</h3>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Salesman Bakaya</p>
+                    <h3 className="text-3xl font-extrabold text-amber-600 mt-1">Rs. {totalMarketBakaya.toLocaleString()}</h3>
                   </div>
-                  <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
                     <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-xl mb-3">📉</div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Expenses</p>
-                    <h3 className="text-3xl font-black text-slate-800 mt-1">Rs. {totalExp.toLocaleString()}</h3>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total Expenses</p>
+                    <h3 className="text-3xl font-extrabold text-slate-900 mt-1">Rs. {totalExp.toLocaleString()}</h3>
                   </div>
-                  <div className={`p-6 rounded-3xl shadow-xl text-white ${netProfit >= 0 ? 'bg-gradient-to-br from-slate-800 to-slate-900' : 'bg-rose-600'}`}>
-                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-xl mb-3">💎</div>
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Net Cash Profit</p>
-                    <h3 className="text-3xl font-black mt-1">Rs. {netProfit.toLocaleString()}</h3>
+                  <div className={`p-6 rounded-3xl shadow-xl text-white ${netProfit >= 0 ? 'bg-gradient-to-br from-[#0B1120] to-slate-900 border border-slate-800' : 'bg-rose-600'}`}>
+                    <div className="w-12 h-12 bg-amber-400/20 text-amber-400 rounded-2xl flex items-center justify-center text-xl mb-3">💎</div>
+                    <p className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest">Net Cash Profit</p>
+                    <h3 className="text-3xl font-extrabold mt-1">Rs. {netProfit.toLocaleString()}</h3>
                   </div>
                 </div>
 
-                {/* NEW: SALESMAN KHATA LIST ON DASHBOARD (CLICK NAME FOR WEEKLY / MONTHLY / YEARLY) */}
                 <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
                     <div>
-                      <h3 className="font-black text-xl text-slate-900">📒 Salesman Khata List (Click Name for Weekly / Monthly / Yearly)</h3>
+                      <h3 className="font-extrabold text-xl text-slate-900">📒 Salesman Khata List (Click Name for Weekly / Monthly / Yearly)</h3>
                       <p className="text-xs font-bold text-slate-400 mt-0.5">Kisi bhi salesman ke naam par click kar ke uska hafta-war, mahana aur salana hisab dekhein</p>
                     </div>
-                    <button onClick={() => setActiveTab('khata')} className="text-xs font-black bg-slate-900 text-white px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
-                      Manage All Khatas →
-                    </button>
+                    {isManager && (
+                      <button onClick={() => setActiveTab('khata')} className="text-xs font-extrabold bg-[#0B1120] text-amber-400 px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
+                        Manage All Khatas →
+                      </button>
+                    )}
                   </div>
 
                   {khatas.length === 0 ? (
                     <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                       <p className="text-sm font-bold text-slate-500">Abhi koi salesman add nahi hai.</p>
-                      <button onClick={() => setActiveTab('khata')} className="mt-2 text-xs font-black text-indigo-600 underline">+ Salesman Add Karein</button>
+                      {isManager && (
+                        <button onClick={() => setActiveTab('khata')} className="mt-2 text-xs font-extrabold text-indigo-600 underline">+ Salesman Add Karein</button>
+                      )}
                     </div>
                   ) : (
                     <div className="overflow-x-auto hide-scroll">
                       <table className="w-full text-left text-sm whitespace-nowrap min-w-[650px]">
-                        <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                        <thead className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 border-b">
                           <tr>
                             <th className="pb-4 px-2">Salesman Name (Click)</th>
                             <th className="pb-4 px-2">Route / Phone</th>
@@ -992,7 +1423,7 @@
                                 <td className="py-4 px-2">
                                   <button 
                                     onClick={() => { setDashSalesmanModalId(sm.id); setKhataPeriod('weekly'); }} 
-                                    className="font-black text-base text-indigo-700 hover:text-indigo-900 underline decoration-indigo-300 underline-offset-4 flex items-center gap-2"
+                                    className="font-extrabold text-base text-indigo-700 hover:text-indigo-900 underline decoration-indigo-300 underline-offset-4 flex items-center gap-2"
                                   >
                                     <span>👤 {sm.name}</span>
                                   </button>
@@ -1003,14 +1434,14 @@
                                 <td className="py-4 px-2 text-right font-bold text-slate-700">Rs. {st.totalStock.toLocaleString()}</td>
                                 <td className="py-4 px-2 text-right font-bold text-emerald-600">Rs. {st.totalPaid.toLocaleString()}</td>
                                 <td className="py-4 px-2 text-right">
-                                  <span className={`font-black text-base px-3 py-1 rounded-xl ${st.balance > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  <span className={`font-extrabold text-base px-3 py-1 rounded-xl ${st.balance > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                     Rs. {st.balance.toLocaleString()}
                                   </span>
                                 </td>
                                 <td className="py-4 px-2 text-right">
                                   <button 
                                     onClick={() => { setDashSalesmanModalId(sm.id); setKhataPeriod('weekly'); }} 
-                                    className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition shadow-sm"
+                                    className="text-[10px] font-extrabold uppercase tracking-wider bg-[#0B1120] text-amber-400 px-3.5 py-2 rounded-xl hover:bg-slate-800 transition shadow-sm"
                                   >
                                     View Khata
                                   </button>
@@ -1024,12 +1455,13 @@
                   )}
                 </div>
 
-                {/* RECENT TRANSACTIONS */}
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm">
-                  <h3 className="font-black text-xl mb-6">Recent Transactions (Manage Returns & Reprints)</h3>
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm">
+                  <h3 className="font-extrabold text-xl mb-6">
+                    {isManager ? 'Recent Transactions (Manage Returns & Reprints)' : 'Recent Sales & Cash Recoveries (View Only)'}
+                  </h3>
                   <div className="overflow-x-auto hide-scroll">
-                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
-                      <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[650px]">
+                      <thead className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 border-b">
                         <tr>
                           <th className="pb-4 px-2">Order ID</th>
                           <th className="pb-4 px-2">Date/Time</th>
@@ -1042,20 +1474,24 @@
                       <tbody className="divide-y divide-slate-50">
                         {sales.map(s => (
                           <tr key={s.id} className="hover:bg-slate-50">
-                            <td className="py-4 px-2 font-black text-slate-700">{s.id}</td>
+                            <td className="py-4 px-2 font-extrabold text-slate-700">{s.id}</td>
                             <td className="py-4 px-2 text-xs font-bold text-slate-400">{s.date}</td>
                             <td className="py-4 px-2 font-bold">
                               {s.customer}
-                              {s.refundedAmount > 0 && <span className="ml-2 text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-black">Returned: Rs.{s.refundedAmount}</span>}
+                              {s.refundedAmount > 0 && <span className="ml-2 text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-extrabold">Returned: Rs.{s.refundedAmount}</span>}
                             </td>
-                            <td className="py-4 px-2"><span className={`text-[9px] px-3 py-1.5 rounded-lg font-black uppercase tracking-widest ${s.type==='Khata Cash'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-800'}`}>{s.type}</span></td>
-                            <td className="py-4 px-2 text-right font-black text-base">Rs. {s.amount}</td>
+                            <td className="py-4 px-2"><span className={`text-[9px] px-3 py-1.5 rounded-lg font-extrabold uppercase tracking-widest ${s.type==='Khata Cash'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-800'}`}>{s.type}</span></td>
+                            <td className="py-4 px-2 text-right font-extrabold text-base">Rs. {s.amount}</td>
                             <td className="py-4 px-2 text-right space-x-2">
                               {s.items && (
-                                <button onClick={() => setReceipt(s)} className="text-[10px] font-bold tracking-widest uppercase bg-slate-100 text-slate-700 px-3 py-2 rounded-xl hover:bg-slate-800 hover:text-white transition">Bill</button>
+                                <button onClick={() => setReceipt(s)} className="text-[10px] font-bold tracking-widest uppercase bg-slate-100 text-slate-700 px-3 py-2 rounded-xl hover:bg-[#0B1120] hover:text-amber-400 transition">View Bill</button>
                               )}
-                              <button onClick={() => openReturnModal(s)} className="text-[10px] font-bold tracking-widest uppercase bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-xl hover:bg-amber-500 hover:text-white transition">Return / Edit</button>
-                              <button onClick={() => deleteRecord(s.id, 'sale')} className="text-[10px] font-bold tracking-widest uppercase bg-red-50 border border-red-200 text-red-500 px-3 py-2 rounded-xl hover:bg-red-500 hover:text-white transition">Full Revert</button>
+                              {isManager && (
+                                <>
+                                  <button onClick={() => openReturnModal(s)} className="text-[10px] font-bold tracking-widest uppercase bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-xl hover:bg-amber-500 hover:text-white transition">Return / Edit</button>
+                                  <button onClick={() => deleteRecord(s.id, 'sale')} className="text-[10px] font-bold tracking-widest uppercase bg-red-50 border border-red-200 text-red-500 px-3 py-2 rounded-xl hover:bg-red-500 hover:text-white transition">Full Revert</button>
+                                </>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1068,42 +1504,67 @@
 
             {/* TAB 4: EXPENSES */}
             {activeTab === 'expenses' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
-                <div className="bg-white p-8 rounded-3xl border shadow-sm h-fit">
-                  <h3 className="font-black text-xl mb-6">Add Expense</h3>
-                  <form onSubmit={(e)=>{ e.preventDefault(); if(!expForm.title || !expForm.amount) return alert('Fill details!'); setExpenses([{ id: Date.now().toString(), date: new Date().toLocaleDateString(), ...expForm, amount: Number(expForm.amount) }, ...expenses]); setExpForm({title:'', amount:'', category:'Raw Material'}); }} className="space-y-5">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Detail / Bill Name</label>
-                      <input type="text" value={expForm.title} onChange={e=>setExpForm({...expForm, title: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-slate-400" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Amount (Rs)</label>
-                      <input type="number" value={expForm.amount} onChange={e=>setExpForm({...expForm, amount: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-slate-400" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Category Tag</label>
-                      <select value={expForm.category} onChange={e=>setExpForm({...expForm, category: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none">
-                        <option>Raw Material</option><option>Utilities</option><option>Wages</option><option>Other</option>
-                      </select>
-                    </div>
-                    <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl transition shadow-lg tracking-widest uppercase text-sm mt-2">Record Payment</button>
-                  </form>
-                </div>
-                <div className="lg:col-span-2 bg-white p-8 rounded-3xl border shadow-sm">
-                  <h3 className="font-black text-xl mb-6">Expense Registry</h3>
+              <div className={`grid grid-cols-1 ${isManager ? 'lg:grid-cols-3' : ''} gap-6 fade-in`}>
+                {isManager && (
+                  <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm h-fit">
+                    <h3 className="font-extrabold text-xl mb-6">Add Expense</h3>
+                    <form onSubmit={(e)=>{ 
+                      e.preventDefault(); 
+                      if(!expForm.title || !expForm.amount) {
+                        showNotify('Kharchay ki tafseel aur raqam likhein!', 'error');
+                        return;
+                      }
+                      setExpenses([{ id: Date.now().toString(), date: new Date().toLocaleDateString(), ...expForm, amount: Number(expForm.amount) }, ...expenses]); 
+                      setExpForm({title:'', amount:'', category:'Raw Material'}); 
+                      showNotify('Expense record ho gaya!', 'success');
+                    }} className="space-y-5">
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Detail / Bill Name</label>
+                        <input type="text" value={expForm.title} onChange={e=>setExpForm({...expForm, title: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-slate-400" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Amount (Rs)</label>
+                        <input type="number" value={expForm.amount} onChange={e=>setExpForm({...expForm, amount: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-slate-400" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Category Tag</label>
+                        <select value={expForm.category} onChange={e=>setExpForm({...expForm, category: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none">
+                          <option>Raw Material</option><option>Utilities</option><option>Wages</option><option>Other</option>
+                        </select>
+                      </div>
+                      <button type="submit" className="w-full bg-[#0B1120] hover:bg-slate-800 text-amber-400 font-extrabold py-4 rounded-2xl transition shadow-lg tracking-widest uppercase text-sm mt-2">Record Payment</button>
+                    </form>
+                  </div>
+                )}
+
+                <div className={`${isManager ? 'lg:col-span-2' : ''} bg-white p-8 rounded-3xl border border-slate-200 shadow-sm`}>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-extrabold text-xl">Expense Registry</h3>
+                    <span className="bg-rose-50 text-rose-700 border border-rose-200 px-3.5 py-1.5 rounded-xl text-xs font-extrabold">
+                      Total: Rs. {totalExp.toLocaleString()}
+                    </span>
+                  </div>
                   <div className="overflow-x-auto hide-scroll">
                     <table className="w-full text-left text-sm whitespace-nowrap min-w-[500px]">
-                      <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
-                        <tr><th className="pb-4 px-2">Date</th><th className="pb-4 px-2">Description</th><th className="pb-4 px-2">Tag</th><th className="pb-4 px-2 text-right">Cost</th><th className="pb-4 px-2 text-right"></th></tr>
+                      <thead className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 border-b">
+                        <tr>
+                          <th className="pb-4 px-2">Date</th>
+                          <th className="pb-4 px-2">Description</th>
+                          <th className="pb-4 px-2">Tag</th>
+                          <th className="pb-4 px-2 text-right">Cost</th>
+                          {isManager && <th className="pb-4 px-2 text-right"></th>}
+                        </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {expenses.map(e => (
                           <tr key={e.id} className="hover:bg-slate-50 group">
                             <td className="py-4 px-2 text-xs font-bold text-slate-400">{e.date}</td>
-                            <td className="py-4 px-2 font-black text-slate-700">{e.title}</td>
-                            <td className="py-4 px-2"><span className="text-[9px] bg-slate-100 px-3 py-1.5 rounded-lg font-black uppercase tracking-widest text-slate-500">{e.category}</span></td>
-                            <td className="py-4 px-2 text-right font-black text-rose-500 text-base">Rs. {e.amount}</td>
-                            <td className="py-4 px-2 text-right"><button onClick={()=>deleteRecord(e.id, 'expense')} className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-red-500 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition font-bold shadow-sm">✕</button></td>
+                            <td className="py-4 px-2 font-extrabold text-slate-700">{e.title}</td>
+                            <td className="py-4 px-2"><span className="text-[9px] bg-slate-100 px-3 py-1.5 rounded-lg font-extrabold uppercase tracking-widest text-slate-500">{e.category}</span></td>
+                            <td className="py-4 px-2 text-right font-extrabold text-rose-500 text-base">Rs. {e.amount}</td>
+                            {isManager && (
+                              <td className="py-4 px-2 text-right"><button onClick={()=>deleteRecord(e.id, 'expense')} className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-red-500 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition font-bold shadow-sm">✕</button></td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1114,50 +1575,80 @@
             )}
 
             {/* TAB 5: SETTINGS */}
-            {activeTab === 'settings' && (
+            {activeTab === 'settings' && isManager && (
               <div className="space-y-6 fade-in">
-                <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                  <h3 className="font-black text-xl mb-6">Business Profile & Receipt Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Bakery Title (Prints on System & Receipts)</label>
-                      <input type="text" value={settings.name} onChange={e=>setSettings({...settings, name:e.target.value})} className="w-full p-4 bg-amber-50 border border-amber-200 rounded-2xl text-base font-black text-amber-900 focus:outline-none"/>
+                <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+                  <div>
+                    <h3 className="font-extrabold text-xl">Business Profile & Security Keys</h3>
+                    <p className="text-xs font-bold text-slate-400 mt-0.5">Username, Mobile Number, Password aur Master Security Key yahan se manage karein</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="lg:col-span-2">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Bakery Name (Prints on System & Receipts)</label>
+                      <input type="text" value={settings.name} onChange={e=>setSettings({...settings, name:e.target.value})} className="w-full p-4 bg-amber-50 border border-amber-200 rounded-2xl text-base font-extrabold text-amber-900 focus:outline-none"/>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Custom Logo URL (Empty = DAN Biscuit)</label>
+                      <input type="text" placeholder="Leave empty for DAN Biscuit Logo" value={settings.logoUrl || ''} onChange={e=>setSettings({...settings, logoUrl:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none"/>
                     </div>
                     <div className="lg:col-span-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Shop Address (Prints on Invoices)</label>
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Shop Address (Prints on Invoices)</label>
                       <input type="text" value={settings.address} onChange={e=>setSettings({...settings, address:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
                     </div>
-                    
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Owner Name</label>
-                      <input type="text" value={settings.owner} onChange={e=>setSettings({...settings, owner:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Owner Number</label>
-                      <input type="text" value={settings.ownerContact} onChange={e=>setSettings({...settings, ownerContact:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
-                    </div>
-                    <div className="lg:col-span-1 hidden lg:block"></div>
+                  </div>
 
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Manager Name</label>
-                      <input type="text" value={settings.manager} onChange={e=>setSettings({...settings, manager:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                  {/* Owner Login & Security Key */}
+                  <div className="p-5 rounded-3xl bg-emerald-50/70 border border-emerald-200 space-y-4">
+                    <h4 className="font-extrabold text-sm text-emerald-800 uppercase tracking-wider">👑 Owner Login & Security Key (View Only)</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Owner Username</label>
+                        <input type="text" placeholder="e.g. tony" value={settings.ownerUsername || ''} onChange={e=>setSettings({...settings, ownerUsername:e.target.value})} className="w-full p-3.5 bg-white border border-emerald-200 rounded-2xl text-sm font-extrabold text-emerald-900 focus:outline-none"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Owner Mobile Number</label>
+                        <input type="text" placeholder="e.g. 0300-1234567" value={settings.ownerContact} onChange={e=>setSettings({...settings, ownerContact:e.target.value})} className="w-full p-3.5 bg-white border border-emerald-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-widest block mb-1.5">Owner Password / PIN</label>
+                        <input type="text" placeholder="••••" value={settings.ownerPin || ''} onChange={e=>setSettings({...settings, ownerPin:e.target.value})} className="w-full p-3.5 bg-white border border-emerald-300 rounded-2xl text-base font-extrabold tracking-widest text-emerald-800 focus:outline-none text-center"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-amber-700 uppercase tracking-widest block mb-1.5">🔑 Owner Security Key</label>
+                        <input type="text" placeholder="e.g. KEY-12345" value={settings.ownerSecurityKey || ''} onChange={e=>setSettings({...settings, ownerSecurityKey:e.target.value})} className="w-full p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-sm font-extrabold tracking-wider text-amber-900 focus:outline-none text-center"/>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Manager Number</label>
-                      <input type="text" value={settings.managerContact} onChange={e=>setSettings({...settings, managerContact:e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none"/>
-                    </div>
-                    
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 text-rose-500">System Security PIN</label>
-                      <input type="text" value={settings.pin} onChange={e=>setSettings({...settings, pin:e.target.value})} className="w-full p-4 bg-rose-50 border border-rose-200 rounded-2xl text-lg font-black tracking-[0.3em] text-rose-600 focus:outline-none text-center"/>
+                  </div>
+
+                  {/* Manager Login & Security Key */}
+                  <div className="p-5 rounded-3xl bg-amber-50/70 border border-amber-200 space-y-4">
+                    <h4 className="font-extrabold text-sm text-amber-900 uppercase tracking-wider">👨‍💼 Manager Login & Security Key (Full Control)</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Manager Username</label>
+                        <input type="text" placeholder="e.g. tony" value={settings.managerUsername || ''} onChange={e=>setSettings({...settings, managerUsername:e.target.value})} className="w-full p-3.5 bg-white border border-amber-200 rounded-2xl text-sm font-extrabold text-slate-900 focus:outline-none"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Manager Mobile Number</label>
+                        <input type="text" placeholder="e.g. 0300-1234567" value={settings.managerContact} onChange={e=>setSettings({...settings, managerContact:e.target.value})} className="w-full p-3.5 bg-white border border-amber-200 rounded-2xl text-sm font-bold focus:outline-none"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-rose-600 uppercase tracking-widest block mb-1.5">Manager Password / PIN</label>
+                        <input type="text" placeholder="••••" value={settings.pin} onChange={e=>setSettings({...settings, pin:e.target.value})} className="w-full p-3.5 bg-white border border-rose-300 rounded-2xl text-base font-extrabold tracking-widest text-rose-600 focus:outline-none text-center"/>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-amber-800 uppercase tracking-widest block mb-1.5">🔑 Manager Security Key</label>
+                        <input type="text" placeholder="e.g. KEY-12345" value={settings.managerSecurityKey || ''} onChange={e=>setSettings({...settings, managerSecurityKey:e.target.value})} className="w-full p-3.5 bg-amber-100/70 border border-amber-400 rounded-2xl text-sm font-extrabold tracking-wider text-amber-950 focus:outline-none text-center"/>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Add OR Edit Product Matrix Section */}
-                <div className={`p-8 rounded-[2rem] shadow-xl text-white transition-colors ${editingProdId ? 'bg-indigo-950 border-2 border-indigo-400' : 'bg-slate-900'}`}>
+                {/* Add OR Edit Product */}
+                <div className={`p-8 rounded-[2rem] shadow-xl text-white transition-colors ${editingProdId ? 'bg-indigo-950 border-2 border-indigo-400' : 'bg-[#0B1120]'}`}>
                   <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
-                    <h3 className="font-black text-amber-400 text-xl">
+                    <h3 className="font-extrabold text-amber-400 text-xl">
                       {editingProdId ? `✏️ Editing Rates: ${prodForm.name}` : '➕ Add New Product to Menu'}
                     </h3>
                     {editingProdId && (
@@ -1168,15 +1659,15 @@
                   <form onSubmit={handleSaveProduct} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Product Name</label>
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Product Name</label>
                         <input type="text" placeholder="e.g. Pastry" value={prodForm.name} onChange={e=>setProdForm({...prodForm, name: e.target.value})} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none"/>
                       </div>
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Category</label>
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Category</label>
                         <input type="text" placeholder="e.g. Cakes" value={prodForm.category} onChange={e=>setProdForm({...prodForm, category: e.target.value})} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none"/>
                       </div>
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Packing Type</label>
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">Packing Type</label>
                         <select value={prodForm.packingType} onChange={e=>setProdForm({...prodForm, packingType: e.target.value})} className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-bold text-white focus:outline-none">
                           <option value="weight">Weight (1kg / 2kg)</option>
                           <option value="pack">Pack (1 Pack / 5 Pack)</option>
@@ -1186,7 +1677,7 @@
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 space-y-4">
-                        <span className="text-xs font-black text-amber-400 uppercase tracking-widest block">Special Pricing Matrix</span>
+                        <span className="text-xs font-extrabold text-amber-400 uppercase tracking-widest block">Special Pricing Matrix</span>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Retail 1 (1kg/1Pk)</label>
@@ -1208,7 +1699,7 @@
                       </div>
 
                       <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 space-y-4">
-                        <span className="text-xs font-black text-slate-300 uppercase tracking-widest block">Regular Pricing Matrix</span>
+                        <span className="text-xs font-extrabold text-slate-300 uppercase tracking-widest block">Regular Pricing Matrix</span>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Retail 1 (1kg/1Pk)</label>
@@ -1229,36 +1720,41 @@
                         </div>
                       </div>
                     </div>
-                    <button type="submit" className={`w-full font-black py-4 rounded-2xl uppercase tracking-widest text-sm transition shadow-lg ${editingProdId ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-amber-500 hover:bg-amber-400 text-slate-900'}`}>
+                    <button type="submit" className={`w-full font-extrabold py-4 rounded-2xl uppercase tracking-widest text-sm transition shadow-lg ${editingProdId ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-amber-400 hover:bg-amber-300 text-slate-950'}`}>
                       {editingProdId ? 'Update Product Rates' : 'Save New Product'}
                     </button>
                   </form>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl text-white">
-                    <h3 className="font-black text-amber-400 text-xl border-b border-slate-700 pb-4 mb-4">Existing Menu Items (Edit Rates / Delete)</h3>
+                  <div className="bg-[#0B1120] p-8 rounded-[2rem] shadow-xl text-white">
+                    <h3 className="font-extrabold text-amber-400 text-xl border-b border-slate-800 pb-4 mb-4">Existing Menu Items (Edit Rates / Delete)</h3>
                     <div className="max-h-[340px] overflow-y-auto divide-y divide-slate-800 pr-2">
                       {products.map(p => (
                         <div key={p.id} className="py-4 flex justify-between items-center gap-2">
                           <div>
-                            <p className="font-black text-sm">{p.name}</p>
+                            <p className="font-extrabold text-sm">{p.name}</p>
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                               {p.category} | Spl: Rs.{p.sp1} | Khata: Rs.{p.wsSp1 || p.sp1}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <button onClick={() => startEditProduct(p)} className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-indigo-500 hover:text-white transition">Edit</button>
-                            <button onClick={()=>{ if(window.confirm('Delete item permanently?')) setProducts(products.filter(x=>x.id!==p.id)) }} className="bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition">Delete</button>
+                            <button onClick={()=>{ 
+                              if(window.confirm('Delete item permanently?')) {
+                                setProducts(products.filter(x=>x.id!==p.id));
+                                showNotify('Item menu se delete kar diya gaya.', 'info');
+                              }
+                            }} className="bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition">Delete</button>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2rem] shadow-xl text-white flex flex-col justify-center items-start">
+                  <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 rounded-[2rem] shadow-xl text-white flex flex-col justify-center items-start">
                     <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-inner">📊</div>
-                    <h3 className="font-black text-2xl mb-2">Excel Backup</h3>
+                    <h3 className="font-extrabold text-2xl mb-2">Excel Backup</h3>
                     <p className="text-sm text-emerald-50 font-medium mb-8 opacity-90 leading-relaxed">Download a complete CSV spreadsheet of all your sales, Khata balances, and expenses.</p>
                     <button onClick={()=>{
                       let csv = 'Type,ID,Date,Detail,Category,Returned,Net_Amount\n';
@@ -1266,7 +1762,8 @@
                       khatas.forEach(k => { const st = getSalesmanStats(k); csv += `Khata_Balance,${k.id},"${new Date().toLocaleDateString()}","${k.name} (${k.phone})",Bakaya,0,${st.balance}\n`; });
                       expenses.forEach(e => csv += `Expense,${e.id},"${e.date}","${e.title}",${e.category},0,${e.amount}\n`);
                       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `${settings.name}_Backup.csv`; a.click();
-                    }} className="w-full bg-white text-emerald-700 font-black py-4 rounded-2xl shadow-lg tracking-widest uppercase text-sm hover:scale-[1.02] transition-transform">Download File</button>
+                      showNotify('Excel CSV Backup download ho gaya!', 'success');
+                    }} className="w-full bg-white text-emerald-800 font-extrabold py-4 rounded-2xl shadow-lg tracking-widest uppercase text-sm hover:scale-[1.02] transition-transform">Download File</button>
                   </div>
                 </div>
               </div>
@@ -1274,24 +1771,29 @@
           </main>
 
           {/* MOBILE BOTTOM NAVIGATION */}
-          <nav className="md:hidden fixed bottom-0 w-full bg-slate-900 text-white flex justify-around p-2 pb-safe border-t border-slate-800 z-40">
-            <button onClick={() => setActiveTab('pos')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='pos'?'text-amber-400':'text-slate-400'}`}><span className="text-xl">🛒</span><span className="text-[9px] font-bold mt-1">POS</span></button>
-            <button onClick={() => setActiveTab('khata')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='khata'?'text-rose-400':'text-slate-400'}`}><span className="text-xl">📒</span><span className="text-[9px] font-bold mt-1">Khata</span></button>
-            <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='dashboard'?'text-blue-400':'text-slate-400'}`}><span className="text-xl">📈</span><span className="text-[9px] font-bold mt-1">Stats</span></button>
-            <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='expenses'?'text-emerald-400':'text-slate-400'}`}><span className="text-xl">💵</span><span className="text-[9px] font-bold mt-1">Exp</span></button>
-            <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='settings'?'text-white':'text-slate-400'}`}><span className="text-xl">⚙️</span><span className="text-[9px] font-bold mt-1">Set</span></button>
+          <nav className="md:hidden fixed bottom-0 w-full bg-[#0B1120] text-white flex justify-around p-2 pb-safe border-t border-slate-800 z-40">
+            {isManager && (
+              <button onClick={() => setActiveTab('pos')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='pos'?'text-amber-400':'text-slate-400'}`}><span className="text-xl">🛒</span><span className="text-[9px] font-bold mt-1">POS</span></button>
+            )}
+            {isManager && (
+              <button onClick={() => setActiveTab('khata')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='khata'?'text-rose-400':'text-slate-400'}`}><span className="text-xl">📒</span><span className="text-[9px] font-bold mt-1">Khata</span></button>
+            )}
+            <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center p-2 w-20 ${activeTab==='dashboard'?'text-amber-400':'text-slate-400'}`}><span className="text-xl">📈</span><span className="text-[9px] font-bold mt-1">Dashboard</span></button>
+            <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center p-2 w-20 ${activeTab==='expenses'?'text-emerald-400':'text-slate-400'}`}><span className="text-xl">💵</span><span className="text-[9px] font-bold mt-1">Expenses</span></button>
+            {isManager && (
+              <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center p-2 w-16 ${activeTab==='settings'?'text-white':'text-slate-400'}`}><span className="text-xl">⚙️</span><span className="text-[9px] font-bold mt-1">Set</span></button>
+            )}
           </nav>
 
-          {/* NEW: SALESMAN WEEKLY / MONTHLY / YEARLY KHATA MODAL */}
+          {/* SALESMAN WEEKLY / MONTHLY / YEARLY KHATA MODAL */}
           {modalSalesman && (
-            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
               <div className="bg-white rounded-[2rem] w-full max-w-3xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
                 
-                {/* Modal Header */}
-                <div className="p-5 sm:p-6 bg-slate-900 text-white flex justify-between items-start gap-4 shrink-0">
+                <div className="p-5 sm:p-6 bg-[#0B1120] text-white flex justify-between items-start gap-4 shrink-0">
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 block">Salesman Khata Statement</span>
-                    <h3 className="text-2xl font-black mt-0.5">{modalSalesman.name}</h3>
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400 block">Salesman Khata Statement</span>
+                    <h3 className="text-2xl font-extrabold mt-0.5">{modalSalesman.name}</h3>
                     <p className="text-xs text-slate-400 font-bold mt-0.5">
                       {modalSalesman.phone || 'No Phone'} {modalSalesman.route ? `• Route: ${modalSalesman.route}` : ''}
                     </p>
@@ -1299,15 +1801,14 @@
                   <div className="flex items-center gap-3">
                     <div className="text-right bg-white/10 px-4 py-2 rounded-2xl">
                       <span className="text-[9px] uppercase font-bold text-slate-300 block">Total Bakaya</span>
-                      <span className={`text-lg sm:text-xl font-black ${modalOverallStats.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      <span className={`text-lg sm:text-xl font-extrabold ${modalOverallStats.balance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                         Rs. {modalOverallStats.balance.toLocaleString()}
                       </span>
                     </div>
-                    <button onClick={() => setDashSalesmanModalId(null)} className="w-9 h-9 rounded-full bg-white/10 hover:bg-rose-500 text-white font-black transition">✕</button>
+                    <button onClick={() => setDashSalesmanModalId(null)} className="w-9 h-9 rounded-full bg-white/10 hover:bg-rose-500 text-white font-extrabold transition">✕</button>
                   </div>
                 </div>
 
-                {/* Period Filter Tabs (Weekly / Monthly / Yearly / All) */}
                 <div className="p-3 sm:p-4 bg-slate-100 border-b border-slate-200 flex flex-wrap gap-2 shrink-0">
                   {[
                     { id: 'weekly', label: '📅 Weekly (Last 7 Days)' },
@@ -1318,39 +1819,37 @@
                     <button 
                       key={tab.id} 
                       onClick={() => setKhataPeriod(tab.id)} 
-                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition whitespace-nowrap ${khataPeriod === tab.id ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${khataPeriod === tab.id ? 'bg-[#0B1120] text-amber-400 shadow' : 'bg-white text-slate-600 hover:bg-slate-200'}`}
                     >
                       {tab.label}
                     </button>
                   ))}
                 </div>
 
-                {/* Period Summary Boxes */}
                 <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5">
                   <div className="grid grid-cols-3 gap-3 sm:gap-4">
                     <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
-                      <span className="text-[9px] sm:text-[10px] font-black text-rose-600 uppercase block">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold text-rose-600 uppercase block">
                         {khataPeriod === 'weekly' ? 'Weekly Maal' : khataPeriod === 'monthly' ? 'Monthly Maal' : khataPeriod === 'yearly' ? 'Yearly Maal' : 'Total Maal'}
                       </span>
-                      <span className="text-base sm:text-xl font-black text-rose-700 mt-1 block">Rs. {modalPeriodStats.stock.toLocaleString()}</span>
+                      <span className="text-base sm:text-xl font-extrabold text-rose-700 mt-1 block">Rs. {modalPeriodStats.stock.toLocaleString()}</span>
                     </div>
                     <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                      <span className="text-[9px] sm:text-[10px] font-black text-emerald-600 uppercase block">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold text-emerald-600 uppercase block">
                         {khataPeriod === 'weekly' ? 'Weekly Vasooli' : khataPeriod === 'monthly' ? 'Monthly Vasooli' : khataPeriod === 'yearly' ? 'Yearly Vasooli' : 'Total Vasooli'}
                       </span>
-                      <span className="text-base sm:text-xl font-black text-emerald-700 mt-1 block">Rs. {modalPeriodStats.paid.toLocaleString()}</span>
+                      <span className="text-base sm:text-xl font-extrabold text-emerald-700 mt-1 block">Rs. {modalPeriodStats.paid.toLocaleString()}</span>
                     </div>
-                    <div className="bg-slate-900 text-white p-4 rounded-2xl">
-                      <span className="text-[9px] sm:text-[10px] font-black text-amber-400 uppercase block">
+                    <div className="bg-[#0B1120] text-white p-4 rounded-2xl">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold text-amber-400 uppercase block">
                         Period Net Difference
                       </span>
-                      <span className="text-base sm:text-xl font-black mt-1 block">Rs. {modalPeriodStats.netChange.toLocaleString()}</span>
+                      <span className="text-base sm:text-xl font-extrabold mt-1 block">Rs. {modalPeriodStats.netChange.toLocaleString()}</span>
                     </div>
                   </div>
 
-                  {/* Filtered Entries List */}
                   <div>
-                    <h4 className="font-black text-sm text-slate-700 mb-3 uppercase tracking-wider">
+                    <h4 className="font-extrabold text-sm text-slate-700 mb-3 uppercase tracking-wider">
                       Entries ({modalPeriodStats.txs.length})
                     </h4>
                     {modalPeriodStats.txs.length === 0 ? (
@@ -1360,7 +1859,7 @@
                     ) : (
                       <div className="overflow-x-auto border border-slate-200 rounded-2xl">
                         <table className="w-full text-left text-xs whitespace-nowrap">
-                          <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b">
+                          <thead className="bg-slate-50 text-[10px] font-extrabold uppercase text-slate-400 border-b">
                             <tr>
                               <th className="py-3 px-3">Date / Time</th>
                               <th className="py-3 px-3">Type</th>
@@ -1373,13 +1872,13 @@
                               <tr key={tx.id} className="hover:bg-slate-50">
                                 <td className="py-3 px-3 text-slate-500 font-bold">{tx.date}</td>
                                 <td className="py-3 px-3">
-                                  <span className={`px-2.5 py-1 rounded-lg font-black uppercase text-[9px] ${tx.type === 'stock' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  <span className={`px-2.5 py-1 rounded-lg font-extrabold uppercase text-[9px] ${tx.type === 'stock' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                     {tx.type === 'stock' ? 'Maal Diya' : 'Cash Vasool'}
                                   </span>
                                 </td>
                                 <td className="py-3 px-3 font-bold text-slate-800 max-w-[260px] truncate" title={tx.note}>{tx.note}</td>
-                                <td className={`py-3 px-3 text-right font-black text-sm ${tx.type === 'stock' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                  {tx.type === 'stock' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
+                                <td className={`py-3 px-3 text-right font-extrabold text-sm ${tx.type === 'stock' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                  {tx.type === 'stock' ? '+' : '-'} Rs. {Number(tx.amount || 0).toLocaleString()}
                                 </td>
                               </tr>
                             ))}
@@ -1390,20 +1889,23 @@
                   </div>
                 </div>
 
-                {/* Modal Footer */}
                 <div className="p-4 bg-slate-100 border-t flex flex-wrap gap-2 justify-between items-center shrink-0">
-                  <button 
-                    onClick={() => { 
-                      const id = modalSalesman.id;
-                      setDashSalesmanModalId(null); 
-                      setSelectedSalesmanId(id); 
-                      setActiveTab('khata'); 
-                    }} 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider shadow transition"
-                  >
-                    💵 Receive Payment / Open Full Khata
-                  </button>
-                  <button onClick={() => setDashSalesmanModalId(null)} className="bg-slate-300 hover:bg-slate-400 text-slate-800 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition">
+                  {isManager ? (
+                    <button 
+                      onClick={() => { 
+                        const id = modalSalesman.id;
+                        setDashSalesmanModalId(null); 
+                        setSelectedSalesmanId(id); 
+                        setActiveTab('khata'); 
+                      }} 
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-5 py-3 rounded-xl text-xs uppercase tracking-wider shadow transition"
+                    >
+                      💵 Receive Payment / Open Full Khata
+                    </button>
+                  ) : (
+                    <span className="text-xs font-extrabold text-slate-500">👑 Owner View Only</span>
+                  )}
+                  <button onClick={() => setDashSalesmanModalId(null)} className="bg-slate-300 hover:bg-slate-400 text-slate-800 font-extrabold px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition ml-auto">
                     Close
                   </button>
                 </div>
@@ -1413,21 +1915,21 @@
           )}
 
           {/* PARTIAL RETURN / BILL EDIT MODAL */}
-          {returnModalSale && (
-            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
+          {returnModalSale && isManager && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
               <div className="bg-white rounded-[2rem] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-amber-50">
                   <div>
-                    <h3 className="font-black text-lg text-slate-900">Return / Adjust Bill ({returnModalSale.id})</h3>
+                    <h3 className="font-extrabold text-lg text-slate-900">Return / Adjust Bill ({returnModalSale.id})</h3>
                     <p className="text-xs font-bold text-slate-500">Customer: {returnModalSale.customer}</p>
                   </div>
-                  <button onClick={() => setReturnModalSale(null)} className="w-8 h-8 rounded-full bg-white text-slate-600 font-black">✕</button>
+                  <button onClick={() => setReturnModalSale(null)} className="w-8 h-8 rounded-full bg-white text-slate-600 font-extrabold">✕</button>
                 </div>
 
                 <div className="p-6 overflow-y-auto flex-1 space-y-6">
                   {returnModalSale.items && returnModalSale.items.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">1. Return Specific Items (Reduce Qty)</p>
+                      <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-3">1. Return Specific Items (Reduce Qty)</p>
                       <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl px-4">
                         {returnModalSale.items.map((item, idx) => (
                           <div key={idx} className="py-3 flex justify-between items-center gap-2">
@@ -1435,7 +1937,7 @@
                               <p className="font-bold text-xs sm:text-sm text-slate-800">{item.name}</p>
                               <p className="text-[10px] text-slate-400 font-bold">Rs.{item.price} × {item.qty} = Rs.{item.price * item.qty}</p>
                             </div>
-                            <button onClick={() => adjustReturnItemQty(idx, -1)} className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 font-black text-xs hover:bg-rose-500 hover:text-white transition">- Return 1</button>
+                            <button onClick={() => adjustReturnItemQty(idx, -1)} className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 font-extrabold text-xs hover:bg-rose-500 hover:text-white transition">- Return 1</button>
                           </div>
                         ))}
                       </div>
@@ -1443,41 +1945,44 @@
                   )}
 
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">2. Direct Amount Return (e.g., Deduct Rs. 1,000)</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-2">2. Direct Amount Return (e.g., Deduct Rs. 1,000)</label>
                     <div className="flex gap-2">
-                      <input type="number" placeholder="Enter return amount (Rs)" value={customRefundAmt} onChange={e => setCustomRefundAmt(e.target.value)} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-sm font-black focus:outline-none" />
-                      <button type="button" onClick={applyCustomRefund} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-black px-5 rounded-xl text-xs uppercase tracking-wider transition">Deduct</button>
+                      <input type="number" placeholder="Enter return amount (Rs)" value={customRefundAmt} onChange={e => setCustomRefundAmt(e.target.value)} className="flex-1 p-3 bg-white border border-slate-200 rounded-xl text-sm font-extrabold focus:outline-none" />
+                      <button type="button" onClick={applyCustomRefund} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-5 rounded-xl text-xs uppercase tracking-wider transition">Deduct</button>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 text-white p-5 rounded-2xl space-y-2">
+                  <div className="bg-[#0B1120] text-white p-5 rounded-2xl space-y-2">
                     <div className="flex justify-between text-xs text-slate-400 font-bold">
                       <span>Total Returned / Deducted:</span>
                       <span className="text-amber-400">Rs. {returnModalSale.refundedAmount || 0}</span>
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-                      <span className="text-xs font-black uppercase tracking-widest">Updated Net Bill:</span>
-                      <span className="text-2xl font-black text-emerald-400">Rs. {returnModalSale.amount}</span>
+                      <span className="text-xs font-extrabold uppercase tracking-widest">Updated Net Bill:</span>
+                      <span className="text-2xl font-extrabold text-emerald-400">Rs. {returnModalSale.amount}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-4 bg-slate-100 border-t flex gap-2">
-                  <button onClick={saveReturnChanges} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest shadow-lg transition">Save Updated Bill</button>
-                  <button onClick={() => setReturnModalSale(null)} className="px-5 bg-slate-300 text-slate-800 font-black py-3.5 rounded-xl text-xs uppercase tracking-widest">Cancel</button>
+                  <button onClick={saveReturnChanges} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 rounded-xl text-xs uppercase tracking-widest shadow-lg transition">Save Updated Bill</button>
+                  <button onClick={() => setReturnModalSale(null)} className="px-5 bg-slate-300 text-slate-800 font-extrabold py-3.5 rounded-xl text-xs uppercase tracking-widest">Cancel</button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* FIXED NON-OVERLAPPING INVOICE & KHATA SLIP PRINT MODAL */}
+          {/* INVOICE & KHATA SLIP PRINT MODAL */}
           {receipt && (
-            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 fade-in">
               <div className="bg-white rounded-[2rem] w-full max-w-md max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
                 
                 <div id="printable-area" className="bg-white p-5 sm:p-6 text-slate-900 overflow-y-auto flex-1 space-y-4">
-                  <div className="text-center border-b-2 border-dashed border-slate-300 pb-3">
-                    <h2 className="font-black text-xl sm:text-2xl uppercase tracking-wide break-words leading-snug">{settings.name}</h2>
+                  <div className="text-center border-b-2 border-dashed border-slate-300 pb-3 flex flex-col items-center">
+                    <div className="mb-2">
+                      <BrandLogo size="sm" customLogoUrl={settings.logoUrl} />
+                    </div>
+                    <h2 className="font-extrabold text-xl sm:text-2xl uppercase tracking-wide break-words leading-snug">{settings.name}</h2>
                     <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mt-1 leading-snug">
                       {receipt.isKhataSlip ? receipt.txType : `Official ${receipt.type} Bill`}
                     </p>
@@ -1486,7 +1991,7 @@
                   <div className="text-xs font-bold text-slate-700 space-y-1.5 border-b border-slate-200 pb-3">
                     <div className="flex justify-between items-start gap-2">
                       <span className="text-slate-500 shrink-0">Slip / Order ID:</span>
-                      <span className="text-slate-900 font-black text-right break-all">{receipt.orderId}</span>
+                      <span className="text-slate-900 font-extrabold text-right break-all">{receipt.orderId || receipt.id}</span>
                     </div>
                     <div className="flex justify-between items-start gap-2">
                       <span className="text-slate-500 shrink-0">Date:</span>
@@ -1494,7 +1999,7 @@
                     </div>
                     <div className="flex justify-between items-start gap-2">
                       <span className="text-slate-500 shrink-0">{receipt.isKhataSlip ? 'Salesman:' : 'Customer:'}</span>
-                      <span className="text-slate-900 font-black uppercase text-right break-words">{receipt.customer}</span>
+                      <span className="text-slate-900 font-extrabold uppercase text-right break-words">{receipt.customer}</span>
                     </div>
                     {receipt.phone && (
                       <div className="flex justify-between items-start gap-2">
@@ -1505,7 +2010,7 @@
                   </div>
                   
                   <div className="text-xs space-y-2">
-                    <div className="flex justify-between font-black text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5">
+                    <div className="flex justify-between font-extrabold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5">
                       <span>Item / Description</span>
                       <span className="shrink-0 ml-2">Amount</span>
                     </div>
@@ -1520,7 +2025,7 @@
                               </p>
                             )}
                           </div>
-                          <span className="font-black text-sm text-slate-900 shrink-0 text-right whitespace-nowrap">
+                          <span className="font-extrabold text-sm text-slate-900 shrink-0 text-right whitespace-nowrap">
                             Rs. {(i.price * i.qty).toLocaleString()}
                           </span>
                         </div>
@@ -1544,7 +2049,7 @@
                         <span>Today's Entry:</span>
                         <span>Rs. {receipt.amount.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between items-center font-black pt-2.5 mt-1 border-t border-dashed border-slate-400 text-sm sm:text-base">
+                      <div className="flex justify-between items-center font-extrabold pt-2.5 mt-1 border-t border-dashed border-slate-400 text-sm sm:text-base">
                         <span className="uppercase">Net Bakaya:</span>
                         <span className="text-lg sm:text-xl">Rs. {receipt.newBalance.toLocaleString()}</span>
                       </div>
@@ -1563,7 +2068,7 @@
                           <span>- Rs. {receipt.refundedAmount.toLocaleString()}</span>
                         </div>
                       )}
-                      <div className="flex justify-between items-center font-black pt-1 text-sm sm:text-base">
+                      <div className="flex justify-between items-center font-extrabold pt-1 text-sm sm:text-base">
                         <span className="uppercase">Net Pay:</span>
                         <span className="text-xl sm:text-2xl">Rs. {(receipt.total !== undefined ? receipt.total : receipt.amount).toLocaleString()}</span>
                       </div>
@@ -1581,8 +2086,8 @@
                 </div>
 
                 <div className="bg-slate-100 p-3 sm:p-4 flex gap-2 no-print border-t shrink-0">
-                  <button onClick={() => window.print()} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-black py-3.5 rounded-xl transition shadow-lg text-xs uppercase tracking-widest">🖨️ Print Slip</button>
-                  <button onClick={() => setReceipt(null)} className="px-5 bg-slate-300 hover:bg-slate-400 text-slate-800 font-black py-3.5 rounded-xl transition text-xs uppercase tracking-widest">Close</button>
+                  <button onClick={() => window.print()} className="flex-1 bg-[#0B1120] hover:bg-slate-800 text-amber-400 font-extrabold py-3.5 rounded-xl transition shadow-lg text-xs uppercase tracking-widest">🖨️ Print Slip</button>
+                  <button onClick={() => setReceipt(null)} className="px-5 bg-slate-300 hover:bg-slate-400 text-slate-800 font-extrabold py-3.5 rounded-xl transition text-xs uppercase tracking-widest">Close</button>
                 </div>
 
               </div>
